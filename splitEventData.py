@@ -1,3 +1,4 @@
+import os
 import argparse
 import numpy as np
 from array import array
@@ -18,6 +19,9 @@ if __name__ == "__main__":
     dir_out = args.dir_out
     if not dir_out.endswith("/"):
         dir_out += "/"
+
+    os.mkdir(dir_out+"train")
+    os.mkdir(dir_out+"test")
 
     filename_in = path_to_file_in.split("/")[-1]
     filename_out = filename_in.split(".root")[0]
@@ -49,7 +53,7 @@ if __name__ == "__main__":
     print(f"Number of total events: {nEvents}")
 
     tree_out_train = TTree(treename, treename)
-    file_out_train = TFile(dir_out+filename_out+"_train.root", "recreate")
+    file_out_train = TFile(dir_out+"train/"+filename_out+"_train.root", "recreate")
     tree_out_train.Branch("waveform_graphs", "std::vector<TGraph>", graph_vector)
     tree_out_train.Branch("station_number", station_number_train, 'station_number/I')
     tree_out_train.Branch("run_number", run_number_train, 'run_number/I')
@@ -58,7 +62,7 @@ if __name__ == "__main__":
     tree_out_train.SetDirectory(file_out_train)
 
     tree_out_test = TTree(treename, treename)
-    file_out_test = TFile(dir_out+filename_out+"_test.root", "recreate")
+    file_out_test = TFile(dir_out+"test/"+filename_out+"_test.root", "recreate")
     tree_out_test.Branch("waveform_graphs", "std::vector<TGraph>", graph_vector)
     tree_out_test.Branch("station_number", station_number_test, 'station_number/I')
     tree_out_test.Branch("run_number", run_number_test, 'run_number/I')
