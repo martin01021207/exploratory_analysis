@@ -1,6 +1,7 @@
 # Exploratory Analysis
 This workflow serves as an exploratory path of event filtering and event selection in the deep CR search and potentially in the future neutrino search.
 
+
 # 1. Event Filtering & Event Selection
 A three-staged event filtering approach is taken in this analysis.
 ## (1) Working On 10% Burn Sample Data
@@ -15,6 +16,7 @@ Real (background) event images are picked out of the image test set according to
 ## (2) Working On Full Data
 Without re-training the classifiers, all data will go through stage 1, stage 2, and stage 3 as shown above.
 
+
 # 2. Simulations
 ## (1) NuRadioMC Simulated Neutrinos
 ### [Simulated Station Data Sets](https://radio.uchicago.edu/wiki/index.php/Simulations)
@@ -27,7 +29,7 @@ Without re-training the classifiers, all data will go through stage 1, stage 2, 
 
 
 # 4. Code Execution
-
+You will see two flowcharts, **burn sample workflow** and **full data workflow**, when you scroll all the way down. There are many scripts, hopefully it will help understand the workflows with the flowcharts.
 ## FILE 1:  stage1_applyHitFilter.py
 ### (1) Real Data Input .root Files
 **Case 1: Burn sample 10% data (with a JSON file)**
@@ -47,13 +49,13 @@ python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <statio
 The output file is a ROOT file containing C++ vectors saved in a tree, each event (passed HF) has a vector containing 24 TGraphs (channel waveforms).
 
 ## FILE 2:  combineROOTfiles.sh
-This script combines multiple ROOT files into one ROOT file.
-**Case 1: Combine real data only or sim data only**
+This script combines multiple ROOT files into one ROOT file.  
+**Case 1: Combine real data only or sim data only**  
 types: filtered, filtered_sim, vars, vars_sim, images, images_sim
 ```
 sh combineROOTfiles.sh -i /PATH/TO/INPUT/DIR/ -s <station> -t <type> -o /PATH/TO/OUTPUT/DIR/
 ```
-**Case 2: Combine real data files and sim data files into one ROOT file**
+**Case 2: Combine real data files and sim data files into one ROOT file**  
 types: filtered, vars, images
 ```
 sh combineROOTfiles.sh -i /PATH/TO/INPUT/DIR/ -s <station> -t <type> -o /PATH/TO/OUTPUT/DIR/ -m /PATH/TO/SIM/DIR/
@@ -81,14 +83,14 @@ python B_makeImages.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTP
 ```
 
 ## FILE 6:  C_trainBDT.py
-Make sure you have two files in the input directory:
+Make sure you have two files in the input directory:  
 **vars_s{station}_train.root** and **vars_s{station}_test.root**
 ```
 python C_trainBDT.py /PATH/TO/INPUT/DIR/ <station>
 ```
 
 ## FILE 7:  D_trainCNN.py
-Make sure you have two files in the input directory:
+Make sure you have two files in the input directory:  
 **images_s{station}_train.root** and **images_s{station}_test.root**
 ### (PyTorch Needed)
 First execute FILE 8: `PyTorch_Generate_CNN_Model.py`
@@ -113,8 +115,7 @@ python collectStage3Images.py /PATH/TO/INPUT/DIR/ <station> /PATH/TO/FALSE_POSIT
 ```
 
 ## FILE 11:  stage3_testCNN.C
-Unfortunately, this script has to be in C++ because there's one function missing in `TMVA::Reader` causing the technical difficulty to test the CNN in Python with images.
-Open the ROOT interface:
+Unfortunately, this script has to be in C++ because there's one function missing in `TMVA::Reader` causing the technical difficulty to test the CNN in Python with images. Open the ROOT interface:
 ```
 root -l
 ```
@@ -122,3 +123,10 @@ Then we can execute the script easily in the ROOT interface:
 ```
 .x stage3_testCNN.C("/PATH/TO/INPUT/TEST/file.root", station, "/PATH/TO/TMVA/TRAINED/weights/", "/PATH/TO/OUTPUT/DIR/")
 ```
+
+## FLOWCHART 1:  
+![image](https://github.com/user-attachments/assets/25a88045-5092-4c45-b5d6-c8596a1baa83)
+
+
+## FLOWCHART 2:  
+![image](https://github.com/user-attachments/assets/efda53e3-21b0-44e2-8dec-2dc65ea794d8)
