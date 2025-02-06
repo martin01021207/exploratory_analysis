@@ -74,7 +74,7 @@ python A_makeVariables.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/O
 ```
 
 ## FILE 5:  B_makeImages.py  
-To generate images, we need to import the module file `MakeImages.py`.
+To generate images, we need to import the module file `MakeImages.py`.  
 **Case 1: Burn sample 10% data**
 ```
 python B_makeImages.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTPUT/DIR/
@@ -85,14 +85,14 @@ python B_makeImages.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTP
 ```
 
 ## FILE 6:  C_trainBDT.py
-Make sure you have two files in the input directory:  
+Make sure you have these two files in the input directory:  
 **vars_s{station}_train.root** and **vars_s{station}_test.root**
 ```
 python C_trainBDT.py /PATH/TO/INPUT/DIR/ <station>
 ```
 
 ## FILE 7:  D_trainCNN.py
-Make sure you have two files in the input directory:  
+Make sure you have these two files in the input directory:  
 **images_s{station}_train.root** and **images_s{station}_test.root**
 ### (PyTorch Needed)
 First execute FILE 8: `PyTorch_Generate_CNN_Model.py`
@@ -111,7 +111,7 @@ python stage2_testBDT.py /PATH/TO/INPUT/TEST/file.root <station> /PATH/TO/TMVA/T
 ```
 
 ## FILE 10:  collectStage3Images.py
-The input directory should have this file: **images_s{station}_test.root**
+In the input directory, you should have this file: **images_s{station}_test.root**
 ```
 python collectStage3Images.py /PATH/TO/INPUT/DIR/ <station> /PATH/TO/FALSE_POSITIVES.json /PATH/TO/OUTPUT/DIR/
 ```
