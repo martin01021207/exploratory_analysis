@@ -1,20 +1,24 @@
 import argparse
+import logging
 import numpy as np
 from array import array
 
+import NuRadioReco.modules.RNO_G.stationHitFilter
+from NuRadioReco.utilities import units, trace_utilities, logging as nulogging
+
 import ROOT
 from ROOT import TFile, TTree, TGraph
-from HitFilter import HitFilter
-import WaveformAnalysisTools as WfAT
 
-nChannels = 24
+
+logger = logging.getLogger("NuRadioReco.example.RNOG.apply_hit_filter")
+logger.setLevel(nulogging.LOGGING_STATUS)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("dir_in", type=str, help="Input directory")
     parser.add_argument("dir_out", type=str, help="Output directory")
-    parser.add_argument("station", type=int, help="Station number")
+    parser.add_argument("station_number", type=int, help="Station number")
     parser.add_argument("--run", type=int, help="Run number")
     parser.add_argument('--json_select', type=str, default=None, help="JSON file of events to select")
     parser.add_argument("--isExcluded", action="store_true", help="Exclude events in JSON")
@@ -22,6 +26,8 @@ if __name__ == "__main__":
     parser.add_argument("--isSim", action="store_true", help="Simulation input")
     parser.add_argument("--sim_E", type=str, help="Simulation energy")
     args = parser.parse_args()
+
+    nulogging.set_general_log_level(logging.ERROR)
 
     dir_in = args.dir_in
     if not dir_in.endswith("/"):
@@ -31,8 +37,8 @@ if __name__ == "__main__":
     if not dir_out.endswith("/"):
         dir_out += "/"
 
-    station = args.station
-    run = args.run
+    stationNumber = args.station_number
+    runNumber = args.run
 
     json_select = args.json_select
     isExcluded = args.isExcluded
@@ -55,12 +61,12 @@ if __name__ == "__main__":
         import json
         with open(json_select, 'r') as json_selectEvents:
             selection = json.loads(json_selectEvents.read())
-        if str(run) in selection:
-            eventList = selection[str(run)]
+        if str(runNumber) in selection:
+            eventList = selection[str(runNumber)]
         else:
             eventList = []
             if not isExcluded:
-                print(f"Run {run} is not in the list, exit now.")
+                print(f"Run {runNumber} is not in the list, exit now.")
                 quit()
 
     fileList = []
@@ -69,17 +75,23 @@ if __name__ == "__main__":
         import os
         import NuRadioReco.modules.io.eventReader as readSimData
         treename = "events_sim"
-        filename_out = f"filtered_sim_s{station}_{sim_E}.root"
+        filename_out = f"filtered_sim_s{stationNumber}_{sim_E}.root"
         for data in os.listdir(dir_in):
             if data.endswith(".nur"):
                 fileList.append(dir_in+str(data))
     else:
-        import NuRadioReco.modules.io.RNO_G.readRNOGDataMattak as readRNOGDataMattak
+        import NuRadioReco.modules.RNO_G.dataProviderRNOG
+        import NuRadioReco.modules.channelResampler
+        import NuRadioReco.modules.channelBandPassFilter
+        import NuRadioReco.modules.channelCWNotchFilter
+        import NuRadioReco.detector.RNO_G.rnog_detector
+        import NuRadioReco.modules.RNO_G.hardwareResponseIncorporator
         treename = "events"
-        filename_out = f"filtered_s{station}_r{run}.root"
-        data = f"station{station}/run{run}/"
+        filename_out = f"filtered_s{stationNumber}_r{runNumber}.root"
+        data = f"station{stationNumber}/run{runNumber}/"
         fileList.append(dir_in+data)
 
+    nChannels = 24
     graph_vector = ROOT.std.vector["TGraph"](nChannels)
     station_number = array('i', [0])
     run_number = array('i', [0])
@@ -97,20 +109,34 @@ if __name__ == "__main__":
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_out.SetDirectory(file_out)
 
+    # Initialize Hit Filter
+    stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
+    stationHitFilter.begin()
+
     nEvents_badSim = 0
     nEvents_FT = 0
     nEvents_total = 0
     nEvents_passedHF = 0
     for file in fileList:
         if isSim:
-            run = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
+            det = None
+            runNumber = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
             eventID_sim = 0
             reader = readSimData.eventReader()
             reader.begin(file)
         else:
-            reader = readRNOGDataMattak.readRNOGData()
-            reader.begin(file, mattak_kwargs={'backend':backend})
-            info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType"])
+            det = NuRadioReco.detector.RNO_G.rnog_detector.Detector(detector_file=None)
+            reader = NuRadioReco.modules.RNO_G.dataProviderRNOG.dataProviderRNOG()
+            reader.begin(files=file, det=det, reader_kwargs={'mattak_kwargs': {'backend': backend}})
+            channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
+            channelResampler.begin()
+            channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
+            channelBandPassFilter.begin()
+            channelCWNotchFilter = NuRadioReco.modules.channelCWNotchFilter.channelCWNotchFilter()
+            channelCWNotchFilter.begin()
+            hardwareResponseIncorporator = NuRadioReco.modules.RNO_G.hardwareResponseIncorporator.hardwareResponseIncorporator()
+            hardwareResponseIncorporator.begin()
+            info = reader.reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType"])
 
         for i_event, event in enumerate(reader.run()):
             station = event.get_station()
@@ -121,11 +147,19 @@ if __name__ == "__main__":
 
             station_number[0] = station_id
             if isSim:
-                run_number[0] = run
+                run_number[0] = runNumber
                 event_number[0] = eventID_sim
                 sim_energy[0] = sim_E_number
                 eventID_sim += 1
             else:
+                det.update(station.get_station_time())
+                channelResampler.run(event, station, det, sampling_rate=5 * units.GHz)
+                channelBandPassFilter.run(
+                    event, station, det,
+                    passband=[0.1 * units.GHz, 0.6 * units.GHz],
+                    filter_type='butter', order=10)
+                hardwareResponseIncorporator.run(event, station, det, sim_to_data=False, mode='phase_only')
+                channelCWNotchFilter.run(event, station, det)
                 run_number[0] = info[i_event].get('run')
                 event_number[0] = info[i_event].get('eventNumber')
                 sim_energy[0] = 0.
@@ -140,24 +174,16 @@ if __name__ == "__main__":
                     if event_number[0] not in eventList:
                         continue
 
-            HF = HitFilter()
-            trace = []
-            times = []
-            RMS = []
-
             for i_channel, channel in enumerate(station.iter_channels()):
                 channel_id = channel.get_id()
                 y = np.array(channel.get_trace())
                 x = np.array(channel.get_times())
 
                 if isSim:
-                    if WfAT.isBadWaveform(y):
+                    isBadTrace, _, _ = trace_utilities.is_NAN_or_INF(y)
+                    if isBadTrace:
                         isBadSimEvent = True
                         break
-
-                trace.append(y)
-                times.append(x)
-                RMS.append( WfAT.getNoiseRMS(y) )
 
                 graph_vector[i_channel] = TGraph(len(x), x, y)
                 graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
@@ -172,26 +198,25 @@ if __name__ == "__main__":
                 nEvents_FT += 1
                 continue
 
-            passed_HF = HF.passedHitFilter(np.array(trace), np.array(times), np.array(RMS))
+            # Hit Filter
+            is_passed_HF = stationHitFilter.run(event, station, det)
 
             nEvents_total += 1
-            if passed_HF:
+            if is_passed_HF:
                 nEvents_passedHF += 1
                 tree_out.Fill()
 
-            del HF
-
-        if isSim:
-            reader.end()
+        reader.end()
 
     file_out.cd()
     tree_out.Write()
     file_out.Close()
 
-    print(f"Station {station}")
     if isSim:
+        print(f"Station {stationNumber}  Energy {sim_E}")
         print("Number of BAD sim events: " + str(nEvents_badSim))
     else:
+        print(f"Station {stationNumber}  Run {runNumber}")
         print("Number of forced trigger events: " + str(nEvents_FT))
     print("Number of total RF events: " + str(nEvents_total))
     print("Number of RF events passed the hitFilter: " + str(nEvents_passedHF))
