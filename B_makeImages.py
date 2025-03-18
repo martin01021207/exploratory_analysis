@@ -6,7 +6,7 @@ import ROOT
 from ROOT import TFile, TTree, TCanvas
 
 import MakeImages
-import WaveformAnalysisTools as WfAT
+from NuRadioReco.utilities import trace_utilities
 
 nChannels = 24
 
@@ -128,8 +128,8 @@ if __name__ == "__main__":
             x = np.array( wf.GetX() )
             y = np.array( wf.GetY() )
 
-            envelopes.append( WfAT.getHilbertEnvelope_trace(y) )
-            RMS.append( WfAT.getNoiseRMS(envelopes[i_channel]) )
+            envelopes.append( trace_utilities.get_hilbert_envelope(y) )
+            RMS.append( trace_utilities.get_split_trace_noise_RMS(envelopes[i_channel]) )
 
             del wf
 
