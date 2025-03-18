@@ -31,7 +31,7 @@ Without re-training the classifiers, all data will go through stage 1, stage 2, 
 # 4. Code Execution
 You will see two flowcharts, **burn sample workflow** and **full data workflow**, when you scroll all the way down. There are many scripts, hopefully it will help understand the workflows with the flowcharts.
 ## FILE 1:  stage1_applyHitFilter.py  
-To use the Hit Filter, we need to import the module file `HitFilter.py`.
+To use the Hit Filter, we need to import the module `stationHitFilter.py` from NuRadioReco.
 ### (1) Real Data Input .root Files
 **Case 1: Burn sample 10% data (with a JSON file)**
 ```
