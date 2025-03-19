@@ -143,7 +143,6 @@ if __name__ == "__main__":
             station_id = station.get_id()
 
             isBadSimEvent = False
-            isFT = False
 
             station_number[0] = station_id
             if isSim:
@@ -152,19 +151,12 @@ if __name__ == "__main__":
                 sim_energy[0] = sim_E_number
                 eventID_sim += 1
             else:
-                det.update(station.get_station_time())
-                channelResampler.run(event, station, det, sampling_rate=5 * units.GHz)
-                channelBandPassFilter.run(
-                    event, station, det,
-                    passband=[0.1 * units.GHz, 0.6 * units.GHz],
-                    filter_type='butter', order=10)
-                hardwareResponseIncorporator.run(event, station, det, sim_to_data=False, mode='phase_only')
-                channelCWNotchFilter.run(event, station, det)
                 run_number[0] = info[i_event].get('run')
                 event_number[0] = info[i_event].get('eventNumber')
                 sim_energy[0] = 0.
                 if info[i_event].get('triggerType') == "FORCE":
-                    isFT = True
+                    nEvents_FT += 1
+                    continue
 
             if isSelectingEvents:
                 if isExcluded:
@@ -173,6 +165,16 @@ if __name__ == "__main__":
                 else:
                     if event_number[0] not in eventList:
                         continue
+
+            if not isSim:
+                det.update(station.get_station_time())
+                channelResampler.run(event, station, det, sampling_rate=5 * units.GHz)
+                channelBandPassFilter.run(
+                    event, station, det,
+                    passband=[0.1 * units.GHz, 0.6 * units.GHz],
+                    filter_type='butter', order=10)
+                hardwareResponseIncorporator.run(event, station, det, sim_to_data=False, mode='phase_only')
+                channelCWNotchFilter.run(event, station, det)
 
             for i_channel, channel in enumerate(station.iter_channels()):
                 channel_id = channel.get_id()
@@ -193,9 +195,6 @@ if __name__ == "__main__":
 
             if isBadSimEvent:
                 nEvents_badSim += 1
-                continue
-            elif isFT:
-                nEvents_FT += 1
                 continue
 
             # Hit Filter
