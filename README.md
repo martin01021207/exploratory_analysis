@@ -69,12 +69,13 @@ python splitEventData.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OU
 ```
 
 ## FILE 4:  A_makeVariables.py
+To make variables, file `MakeVariables.py` needs to be imported.
 ```
 python A_makeVariables.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTPUT/DIR/
 ```
 
 ## FILE 5:  B_makeImages.py  
-To generate images, we need to import the module file `MakeImages.py`.  
+To make images, file `MakeImages.py` needs to be imported.  
 **Case 1: Burn sample 10% data**
 ```
 python B_makeImages.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTPUT/DIR/
