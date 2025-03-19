@@ -5,13 +5,11 @@ from array import array
 import ROOT
 from ROOT import TFile, TTree
 
-# All analysis tools
-import WaveformAnalysisTools as WfAT
-import rpr_calculator as rc
-from HitFilter import HitFilter
+import MakeVariables
+from NuRadioReco.utilities import trace_utilities
+import NuRadioReco.modules.RNO_G.stationHitFilter
 
 nChannels = 24
-nSamples = 2048
 inIceChannels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 21, 22, 23]
 
 
@@ -82,7 +80,6 @@ if __name__ == "__main__":
     coherentSNR_PA = array('f', [0.])
     coherentKurtosis_PA = array('f', [0.])
     coherentEntropy_PA = array('f', [0.])
-    corrMax_PA = array('f', [0.])
 
     nCoincidentPairs_inIce = array('i', [0])
     nHighHits_inIce = array('i', [0])
@@ -96,7 +93,6 @@ if __name__ == "__main__":
     coherentSNR_inIce = array('f', [0.])
     coherentKurtosis_inIce = array('f', [0.])
     coherentEntropy_inIce = array('f', [0.])
-    corrMax_inIce = array('f', [0.])
 
     averageRMS_surface = array('f', [0.])
     averageSNR_surface = array('f', [0.])
@@ -108,7 +104,6 @@ if __name__ == "__main__":
     coherentSNR_surface = array('f', [0.])
     coherentKurtosis_surface = array('f', [0.])
     coherentEntropy_surface = array('f', [0.])
-    corrMax_surface = array('f', [0.])
 
     tree_out.Branch("station_number", station_number, 'station_number/I')
     tree_out.Branch("run_number", run_number, 'run_number/I')
@@ -127,7 +122,6 @@ if __name__ == "__main__":
     tree_out.Branch("coherentSNR_PA", coherentSNR_PA, 'coherentSNR_PA/F')
     tree_out.Branch("coherentKurtosis_PA", coherentKurtosis_PA, 'coherentKurtosis_PA/F')
     tree_out.Branch("coherentEntropy_PA", coherentEntropy_PA, 'coherentEntropy_PA/F')
-    tree_out.Branch("corrMax_PA", corrMax_PA, 'corrMax_PA/F')
 
     tree_out.Branch("nCoincidentPairs_inIce", nCoincidentPairs_inIce, 'nCoincidentPairs_inIce/I')
     tree_out.Branch("nHighHits_inIce", nHighHits_inIce, 'nHighHits_inIce/I')
@@ -141,7 +135,6 @@ if __name__ == "__main__":
     tree_out.Branch("coherentSNR_inIce", coherentSNR_inIce, 'coherentSNR_inIce/F')
     tree_out.Branch("coherentKurtosis_inIce", coherentKurtosis_inIce, 'coherentKurtosis_inIce/F')
     tree_out.Branch("coherentEntropy_inIce", coherentEntropy_inIce, 'coherentEntropy_inIce/F')
-    tree_out.Branch("corrMax_inIce", corrMax_inIce, 'corrMax_inIce/F')
 
     tree_out.Branch("averageRMS_surface", averageRMS_surface, 'averageRMS_surface/F')
     tree_out.Branch("averageSNR_surface", averageSNR_surface, 'averageSNR_surface/F')
@@ -153,10 +146,12 @@ if __name__ == "__main__":
     tree_out.Branch("coherentSNR_surface", coherentSNR_surface, 'coherentSNR_surface/F')
     tree_out.Branch("coherentKurtosis_surface", coherentKurtosis_surface, 'coherentKurtosis_surface/F')
     tree_out.Branch("coherentEntropy_surface", coherentEntropy_surface, 'coherentEntropy_surface/F')
-    tree_out.Branch("corrMax_surface", corrMax_surface, 'corrMax_surface/F')
+
+    # Initialize Hit Filter
+    HF = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter(complete_time_check=True, complete_hit_check=True)
+    HF.begin()
 
     for i_event in range(nEvents):
-        HF = HitFilter(completeTimeSequenceCheck = True, completeHitCheck = True)
         tree_in.GetEntry(i_event)
 
         station_number[0] =  tree_in.station_number
@@ -164,18 +159,16 @@ if __name__ == "__main__":
         event_number[0] = tree_in.event_number
         sim_energy[0] = tree_in.sim_energy
 
-        trace = []
-        times = []
         trace_PA = []
-        trace_inIce = []
         trace_surface = []
+        trace_inIce = []
+        times_inIce = []
+        RMS_inIce = []
         RMS = []
         SNR = []
+        RPR = []
         kurtosis = []
         entropy = []
-
-        col_trace = np.full((nSamples, nChannels), np.nan, dtype = float)
-        col_times = np.copy(col_trace)
 
         sumRMS_PA = 0
         sumSNR_PA = 0
@@ -200,54 +193,39 @@ if __name__ == "__main__":
             y = np.array( wf.GetY() )
             x = np.array( wf.GetX() )
 
-            col_trace[:, i_channel] = y
-            col_times[:, i_channel] = x
-
             # Calculations: RMS, SNR, Kurtosis, Entropy
-            RMS.append( WfAT.getNoiseRMS(y) )
-            SNR.append( WfAT.getSNR(y, RMS[i_channel]) )
-            kurtosis.append( WfAT.getKurtosis(y) )
-            entropy.append( WfAT.getEntropy(y) )
-
-            trace.append(y)
-            times.append(x)
+            RMS.append( trace_utilities.get_split_trace_noise_RMS(y) )
+            SNR.append( trace_utilities.get_signal_to_noise_ratio(y, RMS[i_channel]) )
+            RPR.append( trace_utilities.get_root_power_ratio(y, x, RMS[i_channel]) )
+            kurtosis.append( trace_utilities.get_kurtosis(y) )
+            entropy.append( trace_utilities.get_entropy(y) )
 
             if i_channel < 4:
                 trace_PA.append(y)
                 sumRMS_PA += RMS[i_channel]
                 sumSNR_PA += SNR[i_channel]
+                sumRPR_PA += RPR[i_channel]
                 sumKurtosis_PA += kurtosis[i_channel]
                 sumEntropy_PA += entropy[i_channel]
 
             if i_channel in inIceChannels:
                 trace_inIce.append(y)
+                times_inIce.append(x)
+                RMS_inIce.append(RMS[i_channel])
                 sumRMS_inIce += RMS[i_channel]
                 sumSNR_inIce += SNR[i_channel]
+                sumRPR_inIce += RPR[i_channel]
                 sumKurtosis_inIce += kurtosis[i_channel]
                 sumEntropy_inIce += entropy[i_channel]
             else:
                 trace_surface.append(y)
                 sumRMS_surface += RMS[i_channel]
                 sumSNR_surface += SNR[i_channel]
+                sumRPR_surface += RPR[i_channel]
                 sumKurtosis_surface += kurtosis[i_channel]
                 sumEntropy_surface += entropy[i_channel]
 
             del wf
-
-        # Calculations: RPR
-        reco_handler = rc.RPRCalculator(dt = 0.5)
-        pad_num = np.full(reco_handler.num_ants, len(col_trace[0]))  # Number of samples per channel
-        reco_handler.get_id_hits_prep_to_vertex(pad_v = col_trace, pad_t = col_times, pad_num = nSamples)
-        RPR = reco_handler.rpr_arr
-
-        for i_channel in range(nChannels):
-            if i_channel < 4:
-                sumRPR_PA += RPR[i_channel]
-
-            if i_channel in inIceChannels:
-                sumRPR_inIce += RPR[i_channel]
-            else:
-                sumRPR_surface += RPR[i_channel]
 
         ### Variables ###
         averageRMS_PA[0] = sumRMS_PA / 4
@@ -268,58 +246,58 @@ if __name__ == "__main__":
         averageKurtosis_surface[0] = sumKurtosis_surface / 9
         averageEntropy_surface[0] = sumEntropy_surface / 9
 
+        trace_PA = np.array(trace_PA)
+        trace_surface = np.array(trace_surface)
+        trace_inIce = np.array(trace_inIce)
+        times_inIce = np.array(times_inIce)
+        RMS_inIce = np.array(RMS_inIce)
+
         ### CSW variables ###
-        refIndex_PA, refIndex_inIce, refIndex_surface = WfAT.getReferenceTraceIndices(SNR)
+        refIndex_PA, refIndex_inIce, refIndex_surface = MakeVariables.getReferenceTraceIndices(SNR)
 
         # Calculations: CSW & Impulsivity (PA channels)
-        csw, rolledTraces, corrY, corrX = WfAT.getCSW_trace( np.array(trace_PA), refIndex_PA )
-        #csw = WfAT.trimZeros_trace(csw)
-        impulsivity_PA[0], CDF, indices = WfAT.getImpulsivity(csw)
-        coherentRMS_PA[0] = WfAT.getNoiseRMS(csw)
-        coherentSNR_PA[0] = WfAT.getSNR(csw, coherentRMS_PA[0])
-        coherentKurtosis_PA[0] = WfAT.getKurtosis(csw)
-        coherentEntropy_PA[0] = WfAT.getEntropy(csw)
-        corrMax_PA[0] = WfAT.getCorrMax(corrY, refIndex_PA)
+        csw = trace_utilities.get_coherent_sum( np.delete(trace_PA, refIndex_PA, axis=0), trace_PA[refIndex_PA] )
+        impulsivity_PA[0] = trace_utilities.get_impulsivity(csw)
+        coherentRMS_PA[0] = trace_utilities.get_split_trace_noise_RMS(csw)
+        coherentSNR_PA[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_PA[0])
+        coherentKurtosis_PA[0] = trace_utilities.get_kurtosis(csw)
+        coherentEntropy_PA[0] = trace_utilities.get_entropy(csw)
 
         # Calculations: CSW & Impulsivity (in-ice channels)
-        csw, rolledTraces, corrY, corrX = WfAT.getCSW_trace( np.array(trace_inIce), refIndex_inIce )
-        #csw = WfAT.trimZeros_trace(csw)
-        impulsivity_inIce[0], CDF, indices = WfAT.getImpulsivity(csw)
-        coherentRMS_inIce[0] = WfAT.getNoiseRMS(csw)
-        coherentSNR_inIce[0] = WfAT.getSNR(csw, coherentRMS_inIce[0])
-        coherentKurtosis_inIce[0] = WfAT.getKurtosis(csw)
-        coherentEntropy_inIce[0] = WfAT.getEntropy(csw)
-        corrMax_inIce[0] = WfAT.getCorrMax(corrY, refIndex_inIce)
+        csw = trace_utilities.get_coherent_sum( np.delete(trace_inIce, refIndex_inIce, axis=0), trace_inIce[refIndex_inIce] )
+        impulsivity_inIce[0] = trace_utilities.get_impulsivity(csw)
+        coherentRMS_inIce[0] = trace_utilities.get_split_trace_noise_RMS(csw)
+        coherentSNR_inIce[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_inIce[0])
+        coherentKurtosis_inIce[0] = trace_utilities.get_kurtosis(csw)
+        coherentEntropy_inIce[0] = trace_utilities.get_entropy(csw)
 
         # Calculations: CSW & Impulsivity (surface channels)
-        csw, rolledTraces, corrY, corrX = WfAT.getCSW_trace( np.array(trace_surface), refIndex_surface )
-        #csw = WfAT.trimZeros_trace(csw)
-        impulsivity_surface[0], CDF, indices = WfAT.getImpulsivity(csw)
-        coherentRMS_surface[0] = WfAT.getNoiseRMS(csw)
-        coherentSNR_surface[0] = WfAT.getSNR(csw, coherentRMS_surface[0])
-        coherentKurtosis_surface[0] = WfAT.getKurtosis(csw)
-        coherentEntropy_surface[0] = WfAT.getEntropy(csw)
-        corrMax_surface[0] = WfAT.getCorrMax(corrY, refIndex_surface)
+        csw = trace_utilities.get_coherent_sum( np.delete(trace_surface, refIndex_surface, axis=0), trace_surface[refIndex_surface] )
+        impulsivity_surface[0] = trace_utilities.get_impulsivity(csw)
+        coherentRMS_surface[0] = trace_utilities.get_split_trace_noise_RMS(csw)
+        coherentSNR_surface[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_surface[0])
+        coherentKurtosis_surface[0] = trace_utilities.get_kurtosis(csw)
+        coherentEntropy_surface[0] = trace_utilities.get_entropy(csw)
 
         ### Hit Filter ###
-        passedHitFilter = HF.passedHitFilter(np.array(trace), np.array(times), np.array(RMS))
-        inTimeSequence = HF.isInTimeSequence()
-        overHitThreshold = HF.isOverHitThreshold()
+        HF.set_up(trace_inIce, times_inIce, RMS_inIce)
+        isPassedHF = HF.apply_hit_filter()
+        inTimeWindow = HF.is_in_time_window()
+        overHitThreshold = HF.is_over_hit_threshold()
 
-        nCoincidentPairs_PA[0] = sum(inTimeSequence[0])
+        nCoincidentPairs_PA[0] = sum(inTimeWindow[0])
         nCoincidentPairs_inIce[0] = nCoincidentPairs_PA[0]
         nHighHits_PA[0] = 0
         for i_channel in range(15):
             if i_channel < 4:
                 nHighHits_PA[0] += overHitThreshold[i_channel][0]
                 if i_channel > 0:
-                    nCoincidentPairs_inIce[0] += inTimeSequence[i_channel][0]
+                    nCoincidentPairs_inIce[0] += inTimeWindow[i_channel][0]
 
             nHighHits_inIce[0] += overHitThreshold[i_channel][0]
 
 
         tree_out.Fill()
-        del HF
 
     tree_out.Write()
 
