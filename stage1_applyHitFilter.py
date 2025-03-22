@@ -218,10 +218,10 @@ if __name__ == "__main__":
 
     if isSim:
         print(f"Station {stationNumber}  Energy {sim_E}")
-        print("Number of BAD sim events: " + str(nEvents_badSim))
+        print(f"Number of BAD sim events: {nEvents_badSim}")
     else:
         print(f"Station {stationNumber}  Run {runNumber}")
-        print("Number of forced trigger events: " + str(nEvents_FT))
-        print("Number of RADIANT trigger events: " + str(nEvents_RADIANT))
-    print("Number of total RF events: " + str(nEvents_total))
-    print("Number of RF events passed the hitFilter: " + str(nEvents_passedHF))
+        print(f"Number of forced trigger events: {nEvents_FT}")
+        print(f"Number of RADIANT trigger events: {nEvents_RADIANT}")
+    print(f"Number of total RF events: {nEvents_total}")
+    print(f"Number of RF events passed the hitFilter: {nEvents_passedHF}")
