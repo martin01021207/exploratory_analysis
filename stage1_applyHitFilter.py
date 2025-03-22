@@ -113,8 +113,9 @@ if __name__ == "__main__":
     stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
     stationHitFilter.begin()
 
-    nEvents_badSim = 0
     nEvents_FT = 0
+    nEvents_RADIANT = 0
+    nEvents_badSim = 0
     nEvents_total = 0
     nEvents_passedHF = 0
     for file in fileList:
@@ -154,8 +155,12 @@ if __name__ == "__main__":
                 run_number[0] = info[i_event].get('run')
                 event_number[0] = info[i_event].get('eventNumber')
                 sim_energy[0] = 0.
-                if info[i_event].get('triggerType') == "FORCE":
+                trigger_type = info[i_event].get('triggerType')
+                if trigger_type == "FORCE":
                     nEvents_FT += 1
+                    continue
+                elif "RADIANT" in trigger_type:
+                    nEvents_RADIANT += 1
                     continue
 
             if isSelectingEvents:
@@ -217,5 +222,6 @@ if __name__ == "__main__":
     else:
         print(f"Station {stationNumber}  Run {runNumber}")
         print("Number of forced trigger events: " + str(nEvents_FT))
+        print("Number of RADIANT trigger events: " + str(nEvents_RADIANT))
     print("Number of total RF events: " + str(nEvents_total))
     print("Number of RF events passed the hitFilter: " + str(nEvents_passedHF))
