@@ -290,11 +290,11 @@ if __name__ == "__main__":
         nHighHits_PA[0] = 0
         for i_channel in range(15):
             if i_channel < 4:
-                nHighHits_PA[0] += overHitThreshold[i_channel][0]
+                nHighHits_PA[0] += overHitThreshold[i_channel]
                 if i_channel > 0:
                     nCoincidentPairs_inIce[0] += inTimeWindow[i_channel][0]
 
-            nHighHits_inIce[0] += overHitThreshold[i_channel][0]
+            nHighHits_inIce[0] += overHitThreshold[i_channel]
 
 
         tree_out.Fill()
