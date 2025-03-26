@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
             for i_channel, channel in enumerate(station.iter_channels()):
                 channel_id = channel.get_id()
-                y = np.array(channel.get_trace())
+                y = np.array(channel.get_trace()) / units.mV
                 x = np.array(channel.get_times())
 
                 if isSim:
