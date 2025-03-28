@@ -162,13 +162,14 @@ if __name__ == "__main__":
         trace_PA = []
         trace_surface = []
         trace_inIce = []
-        times_inIce = []
-        RMS_inIce = []
-        RMS = []
-        SNR = []
-        RPR = []
-        kurtosis = []
-        entropy = []
+        trace_HF = []
+        times_HF = []
+        RMS_HF = np.array([])
+        RMS = np.array([])
+        SNR = np.array([])
+        RPR = np.array([])
+        kurtosis = np.array([])
+        entropy = np.array([])
 
         sumRMS_PA = 0
         sumSNR_PA = 0
@@ -194,11 +195,11 @@ if __name__ == "__main__":
             x = np.array( wf.GetX() )
 
             # Calculations: RMS, SNR, Kurtosis, Entropy
-            RMS.append( trace_utilities.get_split_trace_noise_RMS(y) )
-            SNR.append( trace_utilities.get_signal_to_noise_ratio(y, RMS[i_channel]) )
-            RPR.append( trace_utilities.get_root_power_ratio(y, x, RMS[i_channel]) )
-            kurtosis.append( trace_utilities.get_kurtosis(y) )
-            entropy.append( trace_utilities.get_entropy(y) )
+            RMS = np.append( RMS, trace_utilities.get_split_trace_noise_RMS(y) )
+            SNR = np.append( SNR, trace_utilities.get_signal_to_noise_ratio(y, RMS[i_channel]) )
+            RPR = np.append( RPR, trace_utilities.get_root_power_ratio(y, x, RMS[i_channel]) )
+            kurtosis = np.append( kurtosis, trace_utilities.get_kurtosis(y) )
+            entropy = np.append( entropy, trace_utilities.get_entropy(y) )
 
             if i_channel < 4:
                 trace_PA.append(y)
@@ -210,8 +211,9 @@ if __name__ == "__main__":
 
             if i_channel in inIceChannels:
                 trace_inIce.append(y)
-                times_inIce.append(x)
-                RMS_inIce.append(RMS[i_channel])
+                trace_HF.append(y)
+                times_HF.append(x)
+                RMS_HF = np.append(RMS_HF, RMS[i_channel])
                 sumRMS_inIce += RMS[i_channel]
                 sumSNR_inIce += SNR[i_channel]
                 sumRPR_inIce += RPR[i_channel]
@@ -226,6 +228,29 @@ if __name__ == "__main__":
                 sumEntropy_surface += entropy[i_channel]
 
             del wf
+
+        trace_PA = np.array(trace_PA)
+        trace_surface = np.array(trace_surface)
+        trace_inIce = np.array(trace_inIce)
+        trace_HF = np.array(trace_HF)
+        times_HF = np.array(times_HF)
+
+        ### Hit Filter ###
+        HF.set_up(trace_HF, times_HF, RMS_HF)
+        isPassedHF = HF.apply_hit_filter()
+        inTimeWindow = HF.is_in_time_window()
+        overHitThreshold = HF.is_over_hit_threshold()
+
+        nCoincidentPairs_PA[0] = sum(inTimeWindow[0])
+        nCoincidentPairs_inIce[0] = nCoincidentPairs_PA[0]
+        nHighHits_PA[0] = 0
+        for i_channel in range(15):
+            if i_channel < 4:
+                nHighHits_PA[0] += overHitThreshold[i_channel]
+                if i_channel > 0:
+                    nCoincidentPairs_inIce[0] += inTimeWindow[i_channel][0]
+
+            nHighHits_inIce[0] += overHitThreshold[i_channel]
 
         ### Variables ###
         averageRMS_PA[0] = sumRMS_PA / 4
@@ -245,12 +270,6 @@ if __name__ == "__main__":
         averageRPR_surface[0] = sumRPR_surface / 9
         averageKurtosis_surface[0] = sumKurtosis_surface / 9
         averageEntropy_surface[0] = sumEntropy_surface / 9
-
-        trace_PA = np.array(trace_PA)
-        trace_surface = np.array(trace_surface)
-        trace_inIce = np.array(trace_inIce)
-        times_inIce = np.array(times_inIce)
-        RMS_inIce = np.array(RMS_inIce)
 
         ### CSW variables ###
         refIndex_PA, refIndex_inIce, refIndex_surface = MakeVariables.getReferenceTraceIndices(SNR)
@@ -278,23 +297,6 @@ if __name__ == "__main__":
         coherentSNR_surface[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_surface[0])
         coherentKurtosis_surface[0] = trace_utilities.get_kurtosis(csw)
         coherentEntropy_surface[0] = trace_utilities.get_entropy(csw)
-
-        ### Hit Filter ###
-        HF.set_up(trace_inIce, times_inIce, RMS_inIce)
-        isPassedHF = HF.apply_hit_filter()
-        inTimeWindow = HF.is_in_time_window()
-        overHitThreshold = HF.is_over_hit_threshold()
-
-        nCoincidentPairs_PA[0] = sum(inTimeWindow[0])
-        nCoincidentPairs_inIce[0] = nCoincidentPairs_PA[0]
-        nHighHits_PA[0] = 0
-        for i_channel in range(15):
-            if i_channel < 4:
-                nHighHits_PA[0] += overHitThreshold[i_channel]
-                if i_channel > 0:
-                    nCoincidentPairs_inIce[0] += inTimeWindow[i_channel][0]
-
-            nHighHits_inIce[0] += overHitThreshold[i_channel]
 
 
         tree_out.Fill()
