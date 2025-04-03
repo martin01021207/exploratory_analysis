@@ -96,12 +96,14 @@ if __name__ == "__main__":
     run_number = array('i', [0])
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
 
     tree_out.Branch("image", "std::vector<float>", image_vector)
     tree_out.Branch("station_number", station_number, 'station_number/I')
     tree_out.Branch("run_number", run_number, 'run_number/I')
     tree_out.Branch("event_number", event_number, 'event_number/I')
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
 
     tree_out.SetDirectory(file_out)
 
@@ -114,6 +116,7 @@ if __name__ == "__main__":
         station_number[0] = tree_in.station_number
         run_number[0] = tree_in.run_number
         event_number[0] = tree_in.event_number
+        trigger_time_difference[0] = tree_in.trigger_time_difference
 
         if isCollectingFPevents:
             if event_number[0] not in eventList:
