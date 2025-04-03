@@ -24,6 +24,7 @@ if __name__ == "__main__":
     parser.add_argument("--isExcluded", action="store_true", help="Exclude events in JSON")
     parser.add_argument("--uproot", action="store_true", help="Using uproot backend")
     parser.add_argument("--isSim", action="store_true", help="Simulation input")
+    parser.add_argument("--CR", action="store_true", help="CR simulation")
     parser.add_argument("--sim_E", type=str, help="Simulation energy")
     args = parser.parse_args()
 
@@ -49,7 +50,9 @@ if __name__ == "__main__":
         backend = 'pyroot'
 
     isSim = args.isSim
+    isCR = args.CR
     sim_E = args.sim_E
+
     if sim_E:
         if not sim_E.endswith("eV"):
             sim_E += "eV"
@@ -72,6 +75,8 @@ if __name__ == "__main__":
     fileList = []
 
     if isSim:
+        if isCR:
+            import NuRadioReco.modules.io.NuRadioRecoio as NuRadioRecoio
         import os
         import NuRadioReco.modules.io.eventReader as readSimData
         treename = "events_sim"
@@ -97,6 +102,7 @@ if __name__ == "__main__":
     run_number = array('i', [0])
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
 
     tree_out = ROOT.TTree(treename, treename)
 
@@ -107,12 +113,14 @@ if __name__ == "__main__":
     tree_out.Branch("run_number", run_number, 'run_number/I')
     tree_out.Branch("event_number", event_number, 'event_number/I')
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_out.SetDirectory(file_out)
 
     # Initialize Hit Filter
     stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
     stationHitFilter.begin()
 
+    runNumber = 0
     nEvents_FT = 0
     nEvents_RADIANT = 0
     nEvents_badSim = 0
@@ -121,7 +129,11 @@ if __name__ == "__main__":
     for file in fileList:
         if isSim:
             det = None
-            runNumber = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
+            if not isCR:
+                runNumber = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
+            else:
+                nur_reader = NuRadioRecoio.NuRadioRecoio(file)
+                event_headers = nur_reader.get_event_ids()
             eventID_sim = 0
             reader = readSimData.eventReader()
             reader.begin(file)
@@ -137,7 +149,7 @@ if __name__ == "__main__":
             channelCWNotchFilter.begin()
             hardwareResponseIncorporator = NuRadioReco.modules.RNO_G.hardwareResponseIncorporator.hardwareResponseIncorporator()
             hardwareResponseIncorporator.begin()
-            info = reader.reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType"])
+            info = reader.reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
 
         for i_event, event in enumerate(reader.run()):
             station = event.get_station()
@@ -150,11 +162,13 @@ if __name__ == "__main__":
                 run_number[0] = runNumber
                 event_number[0] = eventID_sim
                 sim_energy[0] = sim_E_number
+                trigger_time_difference[0] = 0.
                 eventID_sim += 1
             else:
                 run_number[0] = info[i_event].get('run')
                 event_number[0] = info[i_event].get('eventNumber')
                 sim_energy[0] = 0.
+                trigger_time_difference[0] = info[i_event].get('triggerTime') - info[0].get('triggerTime')
                 trigger_type = info[i_event].get('triggerType')
                 if trigger_type == "FORCE":
                     nEvents_FT += 1
@@ -211,6 +225,9 @@ if __name__ == "__main__":
                 tree_out.Fill()
 
         reader.end()
+        if isCR:
+            nur_reader.close_files()
+            runNumber += 1
 
     file_out.cd()
     tree_out.Write()
