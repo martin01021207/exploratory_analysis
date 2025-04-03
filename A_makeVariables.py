@@ -67,6 +67,7 @@ if __name__ == "__main__":
     run_number = array('i', [0])
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
 
     nCoincidentPairs_PA = array('i', [0])
     nHighHits_PA = array('i', [0])
@@ -109,6 +110,7 @@ if __name__ == "__main__":
     tree_out.Branch("run_number", run_number, 'run_number/I')
     tree_out.Branch("event_number", event_number, 'event_number/I')
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
 
     tree_out.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
     tree_out.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
@@ -158,6 +160,7 @@ if __name__ == "__main__":
         run_number[0] = tree_in.run_number
         event_number[0] = tree_in.event_number
         sim_energy[0] = tree_in.sim_energy
+        trigger_time_difference[0] = tree_in.trigger_time_difference
 
         trace_PA = []
         trace_surface = []
