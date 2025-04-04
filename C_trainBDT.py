@@ -64,7 +64,6 @@ dataLoader.AddVariable( "impulsivity_PA"        , 'F')
 dataLoader.AddVariable( "coherentSNR_PA"        , 'F')
 dataLoader.AddVariable( "coherentKurtosis_PA"   , 'F')
 dataLoader.AddVariable( "coherentEntropy_PA"    , 'F')
-dataLoader.AddVariable( "corrMax_PA"            , 'F')
 
 dataLoader.AddVariable( "nCoincidentPairs_inIce", 'I')
 dataLoader.AddVariable( "nHighHits_inIce"       , 'I')
@@ -75,7 +74,6 @@ dataLoader.AddVariable( "impulsivity_inIce"     , 'F')
 dataLoader.AddVariable( "coherentSNR_inIce"     , 'F')
 dataLoader.AddVariable( "coherentKurtosis_inIce", 'F')
 dataLoader.AddVariable( "coherentEntropy_inIce" , 'F')
-dataLoader.AddVariable( "corrMax_inIce"         , 'F')
 
 #dataLoader.AddVariable( "averageSNR_surface"      , 'F')
 #dataLoader.AddVariable( "averageKurtosis_surface" , 'F')
@@ -84,7 +82,6 @@ dataLoader.AddVariable( "corrMax_inIce"         , 'F')
 #dataLoader.AddVariable( "coherentSNR_surface"     , 'F')
 #dataLoader.AddVariable( "coherentKurtosis_surface", 'F')
 #dataLoader.AddVariable( "coherentEntropy_surface" , 'F')
-#dataLoader.AddVariable( "corrMax_surface"         , 'F')
 
 # Spectators will not be trained or tested,
 # but they will be in the final results,
@@ -93,6 +90,7 @@ dataLoader.AddSpectator( "station_number" )
 dataLoader.AddSpectator( "run_number" )
 dataLoader.AddSpectator( "event_number" )
 dataLoader.AddSpectator( "sim_energy" )
+dataLoader.AddSpectator( "trigger_time_difference" )
 
 
 ####################
