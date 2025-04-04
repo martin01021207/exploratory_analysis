@@ -33,15 +33,11 @@ if __name__ == "__main__":
 
     graph_vector = ROOT.std.vector["TGraph"](nChannels)
 
-    station_number_train = array('i', [0])
-    run_number_train = array('i', [0])
-    event_number_train = array('i', [0])
-    sim_energy_train = array('f', [0.])
-
-    station_number_test = array('i', [0])
-    run_number_test = array('i', [0])
-    event_number_test = array('i', [0])
-    sim_energy_test = array('f', [0.])
+    station_number = array('i', [0])
+    run_number = array('i', [0])
+    event_number = array('i', [0])
+    sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
 
     file_in = TFile.Open(path_to_file_in)
     tree_in = file_in.Get(treename)
@@ -55,35 +51,34 @@ if __name__ == "__main__":
     tree_out_train = TTree(treename, treename)
     file_out_train = TFile(dir_out+"train/"+filename_out+"_train.root", "recreate")
     tree_out_train.Branch("waveform_graphs", "std::vector<TGraph>", graph_vector)
-    tree_out_train.Branch("station_number", station_number_train, 'station_number/I')
-    tree_out_train.Branch("run_number", run_number_train, 'run_number/I')
-    tree_out_train.Branch("event_number", event_number_train, 'event_number/I')
-    tree_out_train.Branch("sim_energy", sim_energy_train, 'sim_energy/F')
+    tree_out_train.Branch("station_number", station_number, 'station_number/I')
+    tree_out_train.Branch("run_number", run_number, 'run_number/I')
+    tree_out_train.Branch("event_number", event_number, 'event_number/I')
+    tree_out_train.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_out_train.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_out_train.SetDirectory(file_out_train)
 
     tree_out_test = TTree(treename, treename)
     file_out_test = TFile(dir_out+"test/"+filename_out+"_test.root", "recreate")
     tree_out_test.Branch("waveform_graphs", "std::vector<TGraph>", graph_vector)
-    tree_out_test.Branch("station_number", station_number_test, 'station_number/I')
-    tree_out_test.Branch("run_number", run_number_test, 'run_number/I')
-    tree_out_test.Branch("event_number", event_number_test, 'event_number/I')
-    tree_out_test.Branch("sim_energy", sim_energy_test, 'sim_energy/F')
+    tree_out_test.Branch("station_number", station_number, 'station_number/I')
+    tree_out_test.Branch("run_number", run_number, 'run_number/I')
+    tree_out_test.Branch("event_number", event_number, 'event_number/I')
+    tree_out_test.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_out_test.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_out_test.SetDirectory(file_out_test)
 
     for i_event in range(nEvents):
         tree_in.GetEntry(i_event)
+        station_number[0] = tree_in.station_number
+        run_number[0] = tree_in.run_number
+        event_number[0] = tree_in.event_number
+        sim_energy[0] = tree_in.sim_energy
+        trigger_time_difference[0] = tree_in.sim_energy
 
         if i_event % 2 == 0:
-            station_number_train[0] = tree_in.station_number
-            run_number_train[0] = tree_in.run_number
-            event_number_train[0] = tree_in.event_number
-            sim_energy_train[0] = tree_in.sim_energy
             tree_out_train.Fill()
         else:
-            station_number_test[0] = tree_in.station_number
-            run_number_test[0] = tree_in.run_number
-            event_number_test[0] = tree_in.event_number
-            sim_energy_test[0] = tree_in.sim_energy
             tree_out_test.Fill()
 
     print(f"Number of events for training: {tree_out_train.GetEntries()}")
