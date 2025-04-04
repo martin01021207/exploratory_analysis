@@ -35,24 +35,19 @@ if __name__ == "__main__":
     filename_in = f"images_s{station}_test.root"
     file_in = TFile.Open(dir_in+filename_in)
 
-    image_vector_bkg = ROOT.std.vector["float"](ntot)
-    station_number_bkg = array('i', [0])
-    run_number_bkg = array('i', [0])
-    event_number_bkg = array('i', [0])
-    sim_energy_bkg = array('f', [0.])
+    image_vector = ROOT.std.vector["float"](ntot)
+    station_number = array('i', [0])
+    run_number = array('i', [0])
+    event_number = array('i', [0])
+    sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
 
     tree_bkg_in = file_in.Get("images_bkg")
-    tree_bkg_in.SetBranchAddress("image", ROOT.AddressOf(image_vector_bkg))
+    tree_bkg_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
     nEvents_bkg = tree_bkg_in.GetEntries()
 
-    image_vector_sig = ROOT.std.vector["float"](ntot)
-    station_number_sig = array('i', [0])
-    run_number_sig = array('i', [0])
-    event_number_sig = array('i', [0])
-    sim_energy_sig = array('f', [0.])
-
     tree_sig_in = file_in.Get("images_sig")
-    tree_sig_in.SetBranchAddress("image", ROOT.AddressOf(image_vector_sig))
+    tree_sig_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
     nEvents_sig = tree_sig_in.GetEntries()
 
     filename_out = f"images_s{station}_test_stage3.root"
@@ -62,18 +57,20 @@ if __name__ == "__main__":
 
     file_out = TFile(dir_out+filename_out, "RECREATE")
 
-    tree_bkg_out.Branch("image", "std::vector<float>", image_vector_bkg)
-    tree_bkg_out.Branch("station_number", station_number_bkg, 'station_number/I')
-    tree_bkg_out.Branch("run_number", run_number_bkg, 'run_number/I')
-    tree_bkg_out.Branch("event_number", event_number_bkg, 'event_number/I')
-    tree_bkg_out.Branch("sim_energy", sim_energy_bkg, 'sim_energy/F')
+    tree_bkg_out.Branch("image", "std::vector<float>", image_vector)
+    tree_bkg_out.Branch("station_number", station_number, 'station_number/I')
+    tree_bkg_out.Branch("run_number", run_number, 'run_number/I')
+    tree_bkg_out.Branch("event_number", event_number, 'event_number/I')
+    tree_bkg_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_bkg_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_bkg_out.SetDirectory(file_out)
 
-    tree_sig_out.Branch("image", "std::vector<float>", image_vector_sig)
-    tree_sig_out.Branch("station_number", station_number_sig, 'station_number/I')
-    tree_sig_out.Branch("run_number", run_number_sig, 'run_number/I')
-    tree_sig_out.Branch("event_number", event_number_sig, 'event_number/I')
-    tree_sig_out.Branch("sim_energy", sim_energy_sig, 'sim_energy/F')
+    tree_sig_out.Branch("image", "std::vector<float>", image_vector)
+    tree_sig_out.Branch("station_number", station_number, 'station_number/I')
+    tree_sig_out.Branch("run_number", run_number, 'run_number/I')
+    tree_sig_out.Branch("event_number", event_number, 'event_number/I')
+    tree_sig_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_sig_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_sig_out.SetDirectory(file_out)
 
     for i_event in range(nEvents_bkg):
@@ -85,18 +82,20 @@ if __name__ == "__main__":
         if run in FP:
             eventList = FP[run]
             if event in eventList:
-                station_number_bkg[0] = tree_bkg_in.station_number
-                run_number_bkg[0] = tree_bkg_in.run_number
-                event_number_bkg[0] = tree_bkg_in.event_number
-                sim_energy_bkg[0] = tree_bkg_in.sim_energy
+                station_number[0] = tree_bkg_in.station_number
+                run_number[0] = tree_bkg_in.run_number
+                event_number[0] = tree_bkg_in.event_number
+                sim_energy[0] = tree_bkg_in.sim_energy
+                trigger_time_difference[0] = tree_bkg_in.trigger_time_difference
                 tree_bkg_out.Fill()
 
     for i_event in range(nEvents_sig):
         tree_sig_in.GetEntry(i_event)
-        station_number_sig[0] = tree_sig_in.station_number
-        run_number_sig[0] = tree_sig_in.run_number
-        event_number_sig[0] = tree_sig_in.event_number
-        sim_energy_sig[0] = tree_sig_in.sim_energy
+        station_number[0] = tree_sig_in.station_number
+        run_number[0] = tree_sig_in.run_number
+        event_number[0] = tree_sig_in.event_number
+        sim_energy[0] = tree_sig_in.sim_energy
+        trigger_time_difference[0] = tree_bkg_in.trigger_time_difference
         tree_sig_out.Fill()
 
     tree_bkg_out.Write()
