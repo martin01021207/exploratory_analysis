@@ -74,7 +74,7 @@ if __name__ == "__main__":
         run_number[0] = tree_in.run_number
         event_number[0] = tree_in.event_number
         sim_energy[0] = tree_in.sim_energy
-        trigger_time_difference[0] = tree_in.sim_energy
+        trigger_time_difference[0] = tree_in.trigger_time_difference
 
         if i_event % 2 == 0:
             tree_out_train.Fill()
