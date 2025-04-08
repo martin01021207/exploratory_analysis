@@ -43,7 +43,7 @@ python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <statio
 ```
 ### (2) Simulated Data Input .nur Files
 ```
-python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <station> --isSim --sim_E <energy>
+python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <station> --isSim --CR --sim_E <energy>
 ```
 (energy can be  16.00  16.50  17.00  ...)
 ### (3) Output
@@ -65,7 +65,7 @@ sh combineROOTfiles.sh -i /PATH/TO/INPUT/DIR/ -s <station> -t <type> -o /PATH/TO
 ## FILE 3:  splitEventData.py
 This script splits events of one ROOT file into two ROOT files: **TRAIN** & **TEST**
 ```
-python splitEventData.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTPUT/DIR/
+python splitEventData.py /PATH/TO/INPUT/ROOT/FILTERED/DATA/file.root /PATH/TO/OUTPUT/DIR/ <integer_division>
 ```
 
 ## FILE 4:  A_makeVariables.py
