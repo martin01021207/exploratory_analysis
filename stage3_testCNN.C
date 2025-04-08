@@ -102,7 +102,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   std::vector<float> * userVars = nullptr;
 
   // Input data
-  TTree* tree_S = (TTree*)input->Get("sig_tree");
+  TTree* tree_S = (TTree*)input->Get("images_sig");
   tree_S->SetBranchAddress( "image", &userVars );
   tree_S->SetBranchAddress( "station_number", &station_number );
   tree_S->SetBranchAddress( "run_number", &run_number );
@@ -112,7 +112,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   int nEvents_S = tree_S->GetEntries();
   std::cout << "--- SIGNAL: " << nEvents_S << " events" << std::endl;
 
-  TTree* tree_B = (TTree*)input->Get("bkg_tree");
+  TTree* tree_B = (TTree*)input->Get("images_bkg");
   tree_B->SetBranchAddress( "image", &userVars );
   tree_B->SetBranchAddress( "station_number", &station_number );
   tree_B->SetBranchAddress( "run_number", &run_number );
@@ -163,6 +163,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   testTree_S->Branch( "event_number", &event_number, "event_number/I" );
   testTree_S->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
   //testTree_S->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  testTree_S->SetDirectory(output);
 
   TTree* testTree_B = new TTree("TestTree_B", "TestTree_B");
   testTree_B->SetDirectory(output);
@@ -172,6 +173,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   testTree_B->Branch( "event_number", &event_number, "event_number/I" );
   testTree_B->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
   //testTree_B->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  testTree_B->SetDirectory(output);
 
   TStopwatch sw;
   sw.Start();
