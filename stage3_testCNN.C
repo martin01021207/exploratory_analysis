@@ -66,7 +66,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   int run_number;
   int event_number;
   float sim_energy;
-  float trigger_time_difference;
+  //float trigger_time_difference;
 
   for (unsigned int i = 0; i < vars.size(); i++)
   {
@@ -78,7 +78,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   reader->AddSpectator("run_number", &run_number);
   reader->AddSpectator("event_number", &event_number);
   reader->AddSpectator("sim_energy", &sim_energy);
-  reader->AddSpectator("trigger_time_difference", &trigger_time_difference);
+  //reader->AddSpectator("trigger_time_difference", &trigger_time_difference);
 
   // Book the MVA method
   TString prefix = "TMVA_CNN_Classification";
@@ -108,7 +108,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   tree_S->SetBranchAddress( "run_number", &run_number );
   tree_S->SetBranchAddress( "event_number", &event_number );
   tree_S->SetBranchAddress( "sim_energy", &sim_energy );
-  tree_S->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
+  //tree_S->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
   int nEvents_S = tree_S->GetEntries();
   std::cout << "--- SIGNAL: " << nEvents_S << " events" << std::endl;
 
@@ -118,7 +118,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   tree_B->SetBranchAddress( "run_number", &run_number );
   tree_B->SetBranchAddress( "event_number", &event_number );
   tree_B->SetBranchAddress( "sim_energy", &sim_energy );
-  tree_B->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
+  //tree_B->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
   int nEvents_B = tree_B->GetEntries();
   std::cout << "--- BACKGROUND: " << nEvents_B << " events" << std::endl;
 
@@ -162,7 +162,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   testTree_S->Branch( "run_number", &run_number, "run_number/I" );
   testTree_S->Branch( "event_number", &event_number, "event_number/I" );
   testTree_S->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
-  testTree_S->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  //testTree_S->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
 
   TTree* testTree_B = new TTree("TestTree_B", "TestTree_B");
   testTree_B->SetDirectory(output);
@@ -171,7 +171,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   testTree_B->Branch( "run_number", &run_number, "run_number/I" );
   testTree_B->Branch( "event_number", &event_number, "event_number/I" );
   testTree_B->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
-  testTree_B->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  //testTree_B->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
 
   TStopwatch sw;
   sw.Start();
