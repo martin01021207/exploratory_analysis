@@ -181,7 +181,7 @@ factory.TestAllMethods()
 factory.EvaluateAllMethods()
 
 ### Plot ROC Curve
-roc = factory.GetROCCurve(loader)
+roc = factory.GetROCCurve(dataLoader)
 roc.Draw()
 roc.Print(f"rocCurves_images_s{station_number}.pdf", "pdf")
 
