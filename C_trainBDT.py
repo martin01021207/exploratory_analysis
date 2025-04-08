@@ -90,7 +90,7 @@ dataLoader.AddSpectator( "station_number" )
 dataLoader.AddSpectator( "run_number" )
 dataLoader.AddSpectator( "event_number" )
 dataLoader.AddSpectator( "sim_energy" )
-dataLoader.AddSpectator( "trigger_time_difference" )
+#dataLoader.AddSpectator( "trigger_time_difference" )
 
 
 ####################
