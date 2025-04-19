@@ -4,26 +4,31 @@ nChannels = 24
 inIceChannels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 21, 22, 23]
 
 
-def getReferenceTraceIndices(SNRs):
+def getReferenceTraceIndices(vars, find_max=False):
     refIndex_PA = 0
     refIndex_inIce = 0
     refIndex_surface = 0
 
-    if len(SNRs) != nChannels:
-        print("Need SNRs for all 24 channels...")
+    if len(vars) != nChannels:
+        raise ValueError("Need vars for all 24 channels...")
     else:
-        SNRs_PA = np.array( SNRs[:4] )
-        SNRs_inIce = np.array([])
-        SNRs_surface = np.array([])
+        vars_PA = np.array( vars[:4] )
+        vars_inIce = np.array([])
+        vars_surface = np.array([])
 
         for i in range(nChannels):
             if i in inIceChannels:
-                SNRs_inIce = np.append(SNRs_inIce, SNRs[i])
+                vars_inIce = np.append(vars_inIce, vars[i])
             else:
-                SNRs_surface = np.append(SNRs_surface, SNRs[i])
+                vars_surface = np.append(vars_surface, vars[i])
 
-        refIndex_PA = SNRs_PA.argmax()
-        refIndex_inIce = SNRs_inIce.argmax()
-        refIndex_surface = SNRs_surface.argmax()
+        if find_max:
+            refIndex_PA = vars_PA.argmax()
+            refIndex_inIce = vars_inIce.argmax()
+            refIndex_surface = vars_surface.argmax()
+        else:
+            refIndex_PA = vars_PA.argmin()
+            refIndex_inIce = vars_inIce.argmin()
+            refIndex_surface = vars_surface.argmin()
 
     return refIndex_PA, refIndex_inIce, refIndex_surface
