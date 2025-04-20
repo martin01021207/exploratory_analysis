@@ -46,7 +46,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   TString targetFileName = "testTree_images_" + station_str + ".root";
   TString graphFileName = "testedResults_images_" + station_str + ".pdf";
 
-  int N = 48;
+  int N = 32;
   int ntot = N * N;
 
   // This loads the library
