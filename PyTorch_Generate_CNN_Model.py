@@ -6,7 +6,7 @@ from torch import nn
 # Custom Reshape Layer
 class Reshape(torch.nn.Module):
     def forward(self, x):
-        N = 48
+        N = 32
         return x.view(-1,1,N,N)
 
 # CNN Model Definition
@@ -22,9 +22,9 @@ net = torch.nn.Sequential(
     nn.ReLU(),
     nn.MaxPool2d(kernel_size=2),
     nn.Flatten(),
-    nn.Linear(10*12*12, 288),
+    nn.Linear(10*8*8, 256),
     nn.ReLU(),
-    nn.Linear(288, 2),
+    nn.Linear(256, 2),
     nn.Sigmoid()
     )
 
