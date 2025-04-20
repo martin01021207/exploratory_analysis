@@ -13,20 +13,18 @@ def convertToBinValues(noiseLevel, envelopeTrace, nParts):
     return points
 
 
-def imageHistogram(hist, envelopes, noiseLevels):
-    nChannels = 24
-    N = 48
-
+def imageHistogram(hist, traces, noiseLevels):
+    nTraces = len(traces)
     bins = []
-    for i_channel in range(nChannels):
-        binValues = convertToBinValues( noiseLevels[i_channel], envelopes[i_channel], N )
+
+    for i_trace in range(nTraces):
+        binValues = convertToBinValues( noiseLevels[i_trace], traces[i_trace], nTraces )
         bins.append(binValues)
 
-    for i_channel in range(nChannels):
-        for i_binX in range(N):
-            hist.SetBinContent( i_binX+1, nChannels-i_channel, bins[i_channel][i_binX] )
-            hist.SetBinContent( i_binX+1, nChannels+i_channel+1, bins[i_channel][i_binX] )
-            
+    for i_trace in range(nTraces):
+        for i_binX in range(nTraces):
+            hist.SetBinContent( i_binX+1, i_trace+1, bins[i_trace][i_binX] )
+
     return bins
 
 
