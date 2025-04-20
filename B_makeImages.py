@@ -5,13 +5,16 @@ from array import array
 import ROOT
 from ROOT import TFile, TTree, TCanvas
 
+import MakeVariables
 import MakeImages
 from NuRadioReco.utilities import trace_utilities
 
 nChannels = 24
 
+inIceChannels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 21, 22, 23]
+
 # image size NxN
-N = 48
+N = 32
 ntot = N * N
 
 
@@ -124,19 +127,51 @@ if __name__ == "__main__":
             else:
                 nEvents_FP += 1
 
+        entropy = []
+        trace_PA = []
+        trace_inIce = []
         envelopes = []
         RMS = []
-        for i_channel in range(nChannels):
-            wf = graph_vector[i_channel]
-            x = np.array( wf.GetX() )
+        TKEOs = []
+        RMS_tkeo = []
+        for channel in inIceChannels:
+            wf = graph_vector[channel]
             y = np.array( wf.GetY() )
 
-            envelopes.append( trace_utilities.get_hilbert_envelope(y) )
-            RMS.append( trace_utilities.get_split_trace_noise_RMS(envelopes[i_channel]) )
+            trace_inIce.append(y)
+            if channel < 4:
+                trace_PA.append(y)
+
+            envelope = trace_utilities.get_hilbert_envelope(y)
+            tkeo = trace_utilities.get_teager_kaiser_energy(y)
+
+            entropy.append(trace_utilities.get_entropy(y))
+            envelopes.append(envelope)
+            RMS.append(trace_utilities.get_split_trace_noise_RMS(envelope))
+            TKEOs.append(tkeo)
+            RMS_tkeo.append(trace_utilities.get_split_trace_noise_RMS(tkeo))
 
             del wf
 
-        bins = MakeImages.imageHistogram(hist, envelopes, RMS)
+        refIndex_PA, refIndex_inIce, _ = MakeVariables.getReferenceTraceIndices(entropy)
+
+        trace_PA = np.array(trace_PA)
+        trace_inIce = np.array(trace_inIce)
+        envelopes = np.array(envelopes)
+        RMS = np.array(RMS)
+        TKEOs = np.array(TKEOs)
+        RMS_tkeo = np.array(RMS_tkeo)
+
+        csw_PA = trace_utilities.get_coherent_sum( np.delete(trace_PA, refIndex_PA, axis=0), trace_PA[refIndex_PA] )
+        RMS_PA = trace_utilities.get_split_trace_noise_RMS(csw_PA)
+
+        csw_inIce = trace_utilities.get_coherent_sum( np.delete(trace_inIce, refIndex_inIce, axis=0), trace_inIce[refIndex_inIce] )
+        RMS_inIce = trace_utilities.get_split_trace_noise_RMS(csw_inIce)
+
+        traces_all = np.concatenate([TKEOs, envelopes, [csw_PA, csw_inIce]])
+        RMS_all = np.concatenate([RMS_tkeo, RMS, [RMS_PA, RMS_inIce]])
+
+        bins = MakeImages.imageHistogram(hist, traces_all, RMS_all)
         MakeImages.imageBinsToVector(hist, image_vector)
 
         tree_out.Fill()
