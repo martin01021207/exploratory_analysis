@@ -15,7 +15,7 @@ pyTorchFileName = args.path_to_PyTorch_CNN_model
 if not pyTorchFileName:
     pyTorchFileName = "PyTorch_Generate_CNN_Model.py"
 
-N = 48
+N = 32
 
 #switch off MT in OpenMP (BLAS)
 ROOT.gSystem.Setenv("OMP_NUM_THREADS", "1")
