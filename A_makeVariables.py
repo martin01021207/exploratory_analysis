@@ -275,7 +275,7 @@ if __name__ == "__main__":
         averageEntropy_surface[0] = sumEntropy_surface / 9
 
         ### CSW variables ###
-        refIndex_PA, refIndex_inIce, refIndex_surface = MakeVariables.getReferenceTraceIndices(SNR)
+        refIndex_PA, refIndex_inIce, refIndex_surface = MakeVariables.getReferenceTraceIndices(entropy)
 
         # Calculations: CSW & Impulsivity (PA channels)
         csw = trace_utilities.get_coherent_sum( np.delete(trace_PA, refIndex_PA, axis=0), trace_PA[refIndex_PA] )
