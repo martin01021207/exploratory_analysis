@@ -7,7 +7,7 @@ import ROOT
 from ROOT import TFile, TTree
 
 # image size NxN
-N = 48
+N = 32
 ntot = N * N
 
 
