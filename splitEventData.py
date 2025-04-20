@@ -40,7 +40,7 @@ if __name__ == "__main__":
         graph_vector = ROOT.std.vector["TGraph"](nChannels)
     elif "images" in filename_in:
         type = "I"
-        N = 48
+        N = 32
         ntot = N * N
         image_vector = ROOT.std.vector["float"](ntot)
     elif "vars" in filename_in:
