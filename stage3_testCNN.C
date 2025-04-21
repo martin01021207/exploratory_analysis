@@ -25,15 +25,12 @@ using namespace TMVA;
 using json = nlohmann::json;
 
 
-void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TString dir_out)
+void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TString dir_out, float targetEff = 0.99)
 {
   if (!dir_trainedData.EndsWith("/")) dir_trainedData += "/";
   if (!dir_out.EndsWith("/")) dir_out += "/";
 
   TString station_str = TString::Format("s%d", station);
-
-  // Target signal efficiency
-  float targetEff = 0.98;
 
   // Methods
   //TString method = "TMVA_DNN_CPU";
@@ -239,7 +236,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
 
     graph->SetPoint(graph->GetN(), eff, rej);
 
-    //printf(" Cut %f   Eff %f   Rej %f\n", cut, eff, rej);
+    printf(" Cut %f   Eff %f   Rej %f\n", cut, eff, rej);
 
     double effDiff = std::fabs(eff - targetEff);
     if (effDiff < minDiff)
@@ -358,7 +355,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
 
   float gr_xMin = 0.92;
   float gr_xMax = 1.0015;
-  float gr_yMin = 0.9;
+  float gr_yMin = 0.85;
   float gr_yMax = 1.001;
 
   graph->GetXaxis()->SetRangeUser(gr_xMin, gr_xMax);
