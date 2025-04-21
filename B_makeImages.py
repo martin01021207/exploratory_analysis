@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 trace_PA.append(y)
 
             envelope = trace_utilities.get_hilbert_envelope(y)
-            tkeo = trace_utilities.get_teager_kaiser_energy(y)
+            tkeo = np.sqrt(trace_utilities.get_teager_kaiser_energy(y))
 
             entropy.append(trace_utilities.get_entropy(y))
             envelopes.append(envelope)
@@ -163,9 +163,11 @@ if __name__ == "__main__":
         RMS_tkeo = np.array(RMS_tkeo)
 
         csw_PA = trace_utilities.get_coherent_sum( np.delete(trace_PA, refIndex_PA, axis=0), trace_PA[refIndex_PA] )
+        csw_PA = trace_utilities.get_hilbert_envelope(csw_PA)
         RMS_PA = trace_utilities.get_split_trace_noise_RMS(csw_PA)
 
         csw_inIce = trace_utilities.get_coherent_sum( np.delete(trace_inIce, refIndex_inIce, axis=0), trace_inIce[refIndex_inIce] )
+        csw_inIce = trace_utilities.get_hilbert_envelope(csw_inIce)
         RMS_inIce = trace_utilities.get_split_trace_noise_RMS(csw_inIce)
 
         traces_all = np.concatenate([TKEOs, envelopes, [csw_PA, csw_inIce]])
