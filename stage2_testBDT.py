@@ -10,6 +10,7 @@ parser.add_argument('file_in', type=str, help="Path to the input file")
 parser.add_argument('station', type=str, help="Station number")
 parser.add_argument('dir_trained', type=str, help="Path to the directory of trained BDT weights")
 parser.add_argument('dir_out', type=str, help="Output directory")
+parser.add_argument('--target_eff', type=float, default=0.9999, help="Target signal efficiency")
 args = parser.parse_args()
 
 file_in = args.file_in
@@ -24,7 +25,7 @@ if not dir_out.endswith("/"):
 station_str = f"s{station}"
 
 # Target signal efficiency
-targetEff = 0.9999
+targetEff = args.target_eff
 
 # Method
 method = "BDTD"
