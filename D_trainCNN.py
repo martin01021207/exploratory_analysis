@@ -143,7 +143,7 @@ if useTMVADNN:
 ### TMVA CNN ###
 if useTMVACNN:
     inputLayoutString = f"InputLayout=1|{N}|{N}"
-    layoutString = "Layout=CONV|10|3|3|1|1|1|1|RELU,BNORM,CONV|10|3|3|1|1|1|1|RELU,MAXPOOL|2|2|2|2,CONV|10|3|3|1|1|1|1|RELU,MAXPOOL|2|2|1|1,RESHAPE|FLAT,DENSE|225|RELU,DENSE|1|LINEAR"
+    layoutString = "Layout=CONV|10|3|3|1|1|1|1|RELU,BNORM,CONV|10|3|3|1|1|1|1|RELU,MAXPOOL|2|2|1|1,RESHAPE|FLAT,DENSE|100|RELU,DENSE|1|LINEAR"
     trainingString1 = "LearningRate=1e-3,Momentum=0.9,Repetitions=1,ConvergenceSteps=5,BatchSize=100,TestRepetitions=1,MaxEpochs=20,WeightDecay=1e-4,Regularization=None,Optimizer=ADAM,DropConfig=0.0+0.0+0.0+0.0" # + "|" + trainingString2 + ...
     trainingStrategyString = "TrainingStrategy="
     trainingStrategyString += trainingString1
