@@ -120,7 +120,7 @@ if __name__ == "__main__":
     stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
     stationHitFilter.begin()
 
-    runNumber = 0
+    runNumber_sim = 0
     nEvents_FT = 0
     nEvents_RADIANT = 0
     nEvents_badSim = 0
@@ -130,7 +130,7 @@ if __name__ == "__main__":
         if isSim:
             det = None
             if not isCR:
-                runNumber = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
+                runNumber_sim = int(file.split("/")[-1].split(".nur")[0].split("_")[2])
             else:
                 nur_reader = NuRadioRecoio.NuRadioRecoio(file)
                 event_headers = nur_reader.get_event_ids()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
             station_number[0] = station_id
             if isSim:
-                run_number[0] = runNumber
+                run_number[0] = runNumber_sim
                 event_number[0] = eventID_sim
                 sim_energy[0] = sim_E_number
                 trigger_time_difference[0] = 0.
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         reader.end()
         if isCR:
             nur_reader.close_files()
-            runNumber += 1
+            runNumber_sim += 1
 
     file_out.cd()
     tree_out.Write()
