@@ -35,4 +35,4 @@ def imageBinsToVector(hist, vec):
     for j in range(nh):
         for i in range(nw):
             m = j * nw + i
-            vec[m] = hist.GetBinContent( i+1, j+1 )
+            vec[m] = hist.GetBinContent( j + 1, i + 1 )
