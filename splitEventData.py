@@ -17,15 +17,26 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("path_to_file_in", type=str, help="Path to the input file")
     parser.add_argument("dir_out", type=str, help="Output directory")
-    parser.add_argument("division", type=int, help="N division")
+    parser.add_argument("--path_to_second_file_in", type=str, default=None, help="Path to the second input file")
+    parser.add_argument("--division", type=float, default=None, help="N division")
+    parser.add_argument("--count", type=int, default=None, help="N counts")
     args = parser.parse_args()
 
     path_to_file_in = args.path_to_file_in
+    path_to_second_file_in = args.path_to_second_file_in
+
     dir_out = args.dir_out
     if not dir_out.endswith("/"):
         dir_out += "/"
 
     division = args.division
+    count = args.count
+    if division and count:
+        print("Need to choose between the division mode or the count mode!")
+        quit()
+    elif not division and not count:
+        print("Need to input an integer of division or an integer of count!")
+        quit()
 
     if not os.path.exists(dir_out+"train"):
         os.mkdir(dir_out+"train")
@@ -221,8 +232,48 @@ if __name__ == "__main__":
         tree_out_test.Branch("coherentEntropy_surface", coherentEntropy_surface, 'coherentEntropy_surface/F')
     tree_out_test.SetDirectory(file_out_test)
 
+    if type == "V" and path_to_second_file_in:
+        N = 32
+        ntot = N * N
+        image_vector = ROOT.std.vector["float"](ntot)
+
+        if isSim:
+            treename_2 = "images_sig"
+        else:
+            treename_2 = "images_bkg"
+
+        file_in_2 = TFile.Open(path_to_second_file_in)
+        tree_in_2 = file_in_2.Get(treename_2)
+        tree_in_2.SetBranchAddress("image", ROOT.AddressOf(image_vector))
+
+        filename_out_2 = "images" + filename_out.split("vars")[1]
+
+        tree_out_train_2 = TTree(treename_2, treename_2)
+        file_out_train_2 = TFile(dir_out+"train/"+filename_out_2+"_train.root", "recreate")
+        tree_out_train_2.Branch("image", "std::vector<float>", image_vector)
+        tree_out_train_2.Branch("station_number", station_number, 'station_number/I')
+        tree_out_train_2.Branch("run_number", run_number, 'run_number/I')
+        tree_out_train_2.Branch("event_number", event_number, 'event_number/I')
+        tree_out_train_2.Branch("sim_energy", sim_energy, 'sim_energy/F')
+        tree_out_train_2.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+        tree_out_train_2.SetDirectory(file_out_train_2)
+
+        tree_out_test_2 = TTree(treename_2, treename_2)
+        file_out_test_2 = TFile(dir_out+"test/"+filename_out_2+"_test.root", "recreate")
+        tree_out_test_2.Branch("image", "std::vector<float>", image_vector)
+        tree_out_test_2.Branch("station_number", station_number, 'station_number/I')
+        tree_out_test_2.Branch("run_number", run_number, 'run_number/I')
+        tree_out_test_2.Branch("event_number", event_number, 'event_number/I')
+        tree_out_test_2.Branch("sim_energy", sim_energy, 'sim_energy/F')
+        tree_out_test_2.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+        tree_out_test_2.SetDirectory(file_out_test_2)
+
+    nCounts = 0
     for i_event in range(nEvents):
         tree_in.GetEntry(i_event)
+        if path_to_second_file_in:
+            tree_in_2.GetEntry(i_event)
+
         station_number[0] = tree_in.station_number
         run_number[0] = tree_in.run_number
         event_number[0] = tree_in.event_number
@@ -302,10 +353,25 @@ if __name__ == "__main__":
                 if coherentEntropy_PA[0] > 4.5 and coherentKurtosis_PA[0] < 1.3 and coherentSNR_PA[0] < 3.5 and impulsivity_PA[0] < 0.18:
                     extraConditions = True
 
-        if i_event % division == 0 and extraConditions:
-            tree_out_train.Fill()
-        else:
-            tree_out_test.Fill()
+        if division:
+            if int(i_event % division) == 0 and extraConditions:
+                tree_out_train.Fill()
+                if path_to_second_file_in:
+                    tree_out_train_2.Fill()
+            else:
+                tree_out_test.Fill()
+                if path_to_second_file_in:
+                    tree_out_test_2.Fill()
+        elif count:
+            if nCounts < count and extraConditions:
+                tree_out_train.Fill()
+                if path_to_second_file_in:
+                    tree_out_train_2.Fill()
+            else:
+                tree_out_test.Fill()
+                if path_to_second_file_in:
+                    tree_out_test_2.Fill()
+            nCounts += 1
 
     print(f"Number of events for training: {tree_out_train.GetEntries()}")
     print(f"Number of events for testing: {tree_out_test.GetEntries()}")
@@ -319,3 +385,14 @@ if __name__ == "__main__":
     file_out_test.Close()
 
     file_in.Close()
+
+    if path_to_second_file_in:
+        file_out_train_2.cd()
+        tree_out_train_2.Write()
+        file_out_train_2.Close()
+
+        file_out_test_2.cd()
+        tree_out_test_2.Write()
+        file_out_test_2.Close()
+
+        file_in_2.Close()
