@@ -141,9 +141,9 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
 
   TString histTitle = "TMVA response for classifier: " + method + TString::Format(" (S%d)", station);
   hist_S = new TH1F("hist_S", histTitle, nbin, xMin, xMax);
-  hist_S->SetLineColor(kAzure+2);
+  hist_S->SetLineColorAlpha(kAzure+2, 0.5);
   hist_S->SetLineWidth(3);
-  hist_S->SetFillColorAlpha(kAzure-7, 0.7);
+  hist_S->SetFillColorAlpha(kAzure-7, 0.2);
   hist_B = new TH1F("hist_B", "", nbin, xMin, xMax);
   hist_B->SetLineColor(kRed+1);
   hist_B->SetLineWidth(3);
@@ -290,8 +290,8 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   gPad->SetLogy(1);
 
   canvas.cd();
-  hist_S->Draw();
-  hist_B->Draw("same");
+  hist_B->Draw();
+  hist_S->Draw("same");
 
   float leg_xMin;
   float leg_xMax;
