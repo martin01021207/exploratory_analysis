@@ -67,10 +67,10 @@ if __name__ == "__main__":
         if str(runNumber) in selection:
             eventList = selection[str(runNumber)]
         else:
-            eventList = []
-            if not isExcluded:
-                print(f"Run {runNumber} is not in the list, exit now.")
-                quit()
+            #eventList = []
+            #if not isExcluded:
+            print(f"Run {runNumber} is not in the list, exit now.")
+            quit()
 
     fileList = []
 
