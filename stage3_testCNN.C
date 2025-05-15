@@ -144,7 +144,7 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   hist_S->SetLineColorAlpha(kAzure+2, 0.5);
   hist_S->SetLineWidth(3);
   hist_S->SetFillColorAlpha(kAzure-7, 0.2);
-  hist_B = new TH1F("hist_B", "", nbin, xMin, xMax);
+  hist_B = new TH1F("hist_B", histTitle, nbin, xMin, xMax);
   hist_B->SetLineColor(kRed+1);
   hist_B->SetLineWidth(3);
   hist_B->SetFillColor(kRed+1);
