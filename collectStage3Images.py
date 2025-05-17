@@ -17,6 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("station", type=str, help="Station number")
     parser.add_argument('json_FP', type=str, help="JSON file of false positive events")
     parser.add_argument("dir_out", type=str, help="Output directory")
+    parser.add_argument("--clean_mode", action="store_true", help="Remove runs that have more than one event")
     args = parser.parse_args()
 
     dir_in = args.dir_in
@@ -27,6 +28,10 @@ if __name__ == "__main__":
     json_FP = args.json_FP
     with open(json_FP,'r') as json_falsePositiveEvents:
         FP = json.loads(json_falsePositiveEvents.read())
+
+    clean_mode = args.clean_mode
+    if clean_mode:
+        FP = {k: v for k, v in FP_original.items() if len(v) <= 1}
 
     dir_out = args.dir_out
     if not dir_out.endswith("/"):
