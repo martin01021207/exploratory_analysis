@@ -6,15 +6,17 @@ from array import array
 import json
 
 parser = argparse.ArgumentParser(description='test_BDT')
-parser.add_argument('file_in', type=str, help="Path to the input file")
 parser.add_argument('station', type=str, help="Station number")
+parser.add_argument('file_in', type=str, help="Path to the input file")
+parser.add_argument('sim_file_in', type=str, help="Path to the input simulation file")
 parser.add_argument('dir_trained', type=str, help="Path to the directory of trained BDT weights")
 parser.add_argument('dir_out', type=str, help="Output directory")
 parser.add_argument('--target_eff', type=float, default=0.9999, help="Target signal efficiency")
 args = parser.parse_args()
 
-file_in = args.file_in
 station = args.station
+file_in = args.file_in
+sim_file_in = args.sim_file_in
 dir_trained = args.dir_trained
 if not dir_trained.endswith("/"):
     dir_trained += "/"
@@ -103,10 +105,10 @@ methodName = f"{method} method"
 weightfile = dir_trained + prefix + "_" + method + ".weights.xml"
 reader.BookMVA( methodName, weightfile )
 
-input = TFile.Open(file_in)
-print(f"--- TMVA Classification App    : Using input file: {input.GetName()}")
+input_sig = TFile.Open(sim_file_in)
+print(f"--- TMVA Classification App    : Using input sim file: {input_sig.GetName()}")
 
-tree_S = input.Get(f"vars_sig")
+tree_S = input_sig.Get(f"vars_sig")
 tree_S.SetBranchAddress( "nCoincidentPairs_PA", nCoincidentPairs_PA )
 tree_S.SetBranchAddress( "nHighHits_PA", nHighHits_PA )
 tree_S.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
@@ -133,7 +135,10 @@ tree_S.SetBranchAddress( "sim_energy", sim_energy )
 nEvents_S = tree_S.GetEntries()
 print(f"--- SIGNAL: {nEvents_S} events")
 
-tree_B = input.Get(f"vars_bkg")
+input_bkg = TFile.Open(file_in)
+print(f"--- TMVA Classification App    : Using input file: {input_bkg.GetName()}")
+
+tree_B = input_bkg.Get(f"vars_bkg")
 tree_B.SetBranchAddress( "nCoincidentPairs_PA", nCoincidentPairs_PA )
 tree_B.SetBranchAddress( "nHighHits_PA", nHighHits_PA )
 tree_B.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
@@ -299,6 +304,12 @@ canvas.cd()
 hist_S.Draw()
 hist_B.Draw("same")
 
+yMax_cut= hist_S.GetMaximum()*1.5
+vLine_cut = TLine(cut_selected, 0, cut_selected, yMax_cut)
+vLine_cut.SetLineStyle(2)
+vLine_cut.SetLineWidth(2)
+vLine_cut.Draw("same")
+
 if nEvents_S > nEvents_B:
     leg_xMin = 0.1
     leg_xMax = 0.3
@@ -375,7 +386,8 @@ testTree_B.Write()
 hist_B.Write()
 
 output.Close()
-input.Close()
+input_sig.Close()
+input_bkg.Close()
 del reader
 
 print("==> BDT testing is done!")
