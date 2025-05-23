@@ -114,7 +114,7 @@ python stage2_testBDT.py <station> /PATH/TO/INPUT/TEST/file.root /PATH/TO/SIM/si
 ## FILE 10:  collectStage3Images.py
 In the input directory, you should have this file: **images_s{station}_test.root**
 ```
-python collectStage3Images.py /PATH/TO/INPUT/DIR/ <station> /PATH/TO/FALSE_POSITIVES.json /PATH/TO/OUTPUT/DIR/
+python collectStage3Images.py /PATH/TO/INPUT/DIR/ <station> /PATH/TO/FALSE_POSITIVES.json /PATH/TO/OUTPUT/DIR/ --clean_mode
 ```
 
 ## FILE 11:  stage3_testCNN.C
