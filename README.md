@@ -108,7 +108,7 @@ python PyTorch_Generate_CNN_Model.py
 
 ## FILE 9:  stage2_testBDT.py
 ```
-python stage2_testBDT.py /PATH/TO/INPUT/TEST/file.root <station> /PATH/TO/TMVA/TRAINED/weights/ /PATH/TO/OUTPUT/DIR/
+python stage2_testBDT.py <station> /PATH/TO/INPUT/TEST/file.root /PATH/TO/SIM/sim_file.root /PATH/TO/TMVA/TRAINED/weights/ /PATH/TO/OUTPUT/DIR/
 ```
 
 ## FILE 10:  collectStage3Images.py
@@ -124,7 +124,7 @@ root -l
 ```
 Then we can execute the script easily in the ROOT interface:
 ```
-.x stage3_testCNN.C("/PATH/TO/INPUT/TEST/file.root", station, "/PATH/TO/TMVA/TRAINED/weights/", "/PATH/TO/OUTPUT/DIR/")
+.x stage3_testCNN.C(station, "/PATH/TO/INPUT/TEST/file.root", "/PATH/TO/SIM/sim_file.root", "/PATH/TO/TMVA/TRAINED/weights/", "/PATH/TO/OUTPUT/DIR/")
 ```
 
 ## FLOWCHART 1:  
