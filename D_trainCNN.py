@@ -74,23 +74,33 @@ dataLoader = TMVA.DataLoader(f"dataLoader_images_s{station_number}")
 
 imgSize = N * N
 
-inputFileName_train = f"images_s{station_number}_train.root"
-inputFile_train = TFile.Open(dir_in+inputFileName_train)
-if inputFile_train is None:
-    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (TRAINING) - exit", inputFileName_train.Data())
+inputFileName_sig_train = f"images_s{station_number}_sig_train.root"
+inputFile_sig_train = TFile.Open(dir_in+inputFileName_sig_train)
+if inputFile_sig_train is None:
+    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (SIGNAL TRAINING) - exit", inputFileName_sig_train.Data())
 
-inputFileName_test = f"images_s{station_number}_test.root"
-inputFile_test = TFile.Open(dir_in+inputFileName_test)
-if inputFile_test is None:
-    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (TESTING) - exit", inputFileName_test.Data())
+inputFileName_sig_test = f"images_s{station_number}_sig_test.root"
+inputFile_sig_test = TFile.Open(dir_in+inputFileName_sig_test)
+if inputFile_sig_test is None:
+    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (SIGNAL TESTING) - exit", inputFileName_sig_test.Data())
 
-signalTree_train = inputFile_train.Get("images_sig")
-backgroundTree_train = inputFile_train.Get("images_bkg")
+inputFileName_bkg_train = f"images_s{station_number}_bkg_train.root"
+inputFile_bkg_train = TFile.Open(dir_in+inputFileName_bkg_train)
+if inputFile_bkg_train is None:
+    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (BACKGROUND TRAINING) - exit", inputFileName_bkg_train.Data())
+
+inputFileName_bkg_test = f"images_s{station_number}_bkg_test.root"
+inputFile_bkg_test = TFile.Open(dir_in+inputFileName_bkg_test)
+if inputFile_bkg_test is None:
+    ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (BACKGROUND TESTING) - exit", inputFileName_bkg_test.Data())
+
+signalTree_train = inputFile_sig_train.Get("images_sig")
+backgroundTree_train = inputFile_bkg_train.Get("images_bkg")
 nEventsSig_train = signalTree_train.GetEntries()
 nEventsBkg_train = backgroundTree_train.GetEntries()
 
-signalTree_test = inputFile_test.Get("images_sig")
-backgroundTree_test = inputFile_test.Get("images_bkg")
+signalTree_test = inputFile_sig_test.Get("images_sig")
+backgroundTree_test = inputFile_bkg_test.Get("images_bkg")
 nEventsSig_test = signalTree_test.GetEntries()
 nEventsBkg_test = backgroundTree_test.GetEntries()
 
