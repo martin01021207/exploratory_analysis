@@ -25,7 +25,7 @@ using namespace TMVA;
 using json = nlohmann::json;
 
 
-void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TString dir_out, float targetEff = 0.99)
+void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString dir_trainedData, TString dir_out, float targetEff = 0.99)
 {
   if (!dir_trainedData.EndsWith("/")) dir_trainedData += "/";
   if (!dir_out.EndsWith("/")) dir_out += "/";
@@ -85,21 +85,21 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   TString weightfile = dir_trainedData + prefix + TString("_") + method + TString(".weights.xml");
   reader->BookMVA( methodName, weightfile );
 
-  // Input file
-  TFile *input(0);
-  input = TFile::Open( file_in );
-  if (!input)
+  // Prepare the event tree
+  std::vector<float> * userVars = nullptr;
+
+  // Input Simulation file
+  TFile *input_sig(0);
+  input_sig = TFile::Open( sim_file_in );
+  if (!input_sig)
   {
     std::cout << "ERROR: could not open data file" << std::endl;
     exit(1);
   }
-  std::cout << "--- TMVA_CNN_ClassificationApp    : Using input file: " << input->GetName() << std::endl;
-
-  // Prepare the event tree
-  std::vector<float> * userVars = nullptr;
+  std::cout << "--- TMVA_CNN_ClassificationApp    : Using input sim file: " << input_sig->GetName() << std::endl;
 
   // Input data
-  TTree* tree_S = (TTree*)input->Get("images_sig");
+  TTree* tree_S = (TTree*)input_sig->Get("images_sig");
   tree_S->SetBranchAddress( "image", &userVars );
   tree_S->SetBranchAddress( "station_number", &station_number );
   tree_S->SetBranchAddress( "run_number", &run_number );
@@ -109,7 +109,17 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   int nEvents_S = tree_S->GetEntries();
   std::cout << "--- SIGNAL: " << nEvents_S << " events" << std::endl;
 
-  TTree* tree_B = (TTree*)input->Get("images_bkg");
+  // Input file
+  TFile *input_bkg(0);
+  input_bkg = TFile::Open( file_in );
+  if (!input_bkg)
+  {
+    std::cout << "ERROR: could not open data file" << std::endl;
+    exit(1);
+  }
+  std::cout << "--- TMVA_CNN_ClassificationApp    : Using input file: " << input_bkg->GetName() << std::endl;
+
+  TTree* tree_B = (TTree*)input_bkg->Get("images_bkg");
   tree_B->SetBranchAddress( "image", &userVars );
   tree_B->SetBranchAddress( "station_number", &station_number );
   tree_B->SetBranchAddress( "run_number", &run_number );
@@ -381,7 +391,8 @@ void stage3_testCNN(TString file_in, int station, TString dir_trainedData, TStri
   hist_B->Write();
 
   output->Close();
-  input->Close();
+  input_sig->Close();
+  input_bkg->Close();
   delete reader;
   std::cout << "==> CNN Testing is done!" << std::endl << std::endl;
 }
