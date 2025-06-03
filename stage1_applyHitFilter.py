@@ -41,6 +41,10 @@ if __name__ == "__main__":
     stationNumber = args.station_number
     runNumber = args.run
 
+    highTrigRuns = np.loadtxt(f"/work/hep/martinliu/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
+    if runNumber in highTrigRuns:
+        quit()
+
     json_select = args.json_select
     isExcluded = args.isExcluded
 
@@ -115,6 +119,7 @@ if __name__ == "__main__":
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_out.SetDirectory(file_out)
+    tree_out.SetMaxTreeSize(1000000000000)
 
     # Initialize Hit Filter
     stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
@@ -134,6 +139,9 @@ if __name__ == "__main__":
             else:
                 nur_reader = NuRadioRecoio.NuRadioRecoio(file)
                 event_headers = nur_reader.get_event_ids()
+                cosine = float(file.split("/")[-1].split(".nur")[0].split("-")[1].split("_")[1])
+                theta = int(round(np.arccos(cosine) * (180 / np.pi), 0))
+                phi = int(float(file.split("/")[-1].split(".nur")[0].split("-")[2].split("_")[1]))
             eventID_sim = 0
             reader = readSimData.eventReader()
             reader.begin(file)
@@ -195,10 +203,16 @@ if __name__ == "__main__":
                 hardwareResponseIncorporator.run(event, station, det, sim_to_data=False, mode='phase_only')
                 channelCWNotchFilter.run(event, station, det)
 
+            traces = []
+            times = []
+            channels = np.array([])
             for i_channel, channel in enumerate(station.iter_channels()):
                 channel_id = channel.get_id()
                 y = np.array(channel.get_trace()) / units.mV
                 x = np.array(channel.get_times())
+
+                if isCR:
+                    y = np.roll(y, 800)
 
                 if isSim:
                     isBadTrace, _, _ = trace_utilities.is_NAN_or_INF(y)
@@ -206,10 +220,26 @@ if __name__ == "__main__":
                         isBadSimEvent = True
                         break
 
-                graph_vector[i_channel] = TGraph(len(x), x, y)
+                traces.append(y)
+                times.append(x)
+                channels = np.append(channels, channel_id)
+
+            traces = np.array(traces)
+            times = np.array(times)
+            sorted_indices = channels.argsort()
+            sorted_channels = np.sort(channels)
+            traces = traces[sorted_indices]
+            times = times[sorted_indices]
+
+            for i_channel in sorted_channels:
+                i_channel = int(i_channel)
+                graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
                 graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
                 graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
-                graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{channel_id}"
+                if isCR:
+                    graphTitle = f"({sim_energy[0]},{theta},{phi}): Evt{event_number[0]}, Ch{i_channel}"
+                else:
+                    graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                 graph_vector[i_channel].SetTitle(graphTitle)
 
             if isBadSimEvent:
