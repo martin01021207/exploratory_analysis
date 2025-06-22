@@ -43,8 +43,10 @@ if __name__ == "__main__":
     if not dir_out.endswith("/"):
         dir_out += "/"
 
-    filename_in = f"images_s{station}_bkg_test.root"
-    file_in = TFile.Open(dir_in+filename_in)
+    filename_bkg_in = f"images_s{station}_bkg_test.root"
+    file_bkg_in = TFile.Open(dir_in+filename_bkg_in)
+    filename_sig_in = f"images_s{station}_sig_test.root"
+    file_sig_in = TFile.Open(dir_in+filename_sig_in)
 
     image_vector = ROOT.std.vector["float"](ntot)
     station_number = array('i', [0])
@@ -53,7 +55,7 @@ if __name__ == "__main__":
     sim_energy = array('f', [0.])
     trigger_time_difference = array('f', [0.])
 
-    tree_bkg_in = file_in.Get("images_bkg")
+    tree_bkg_in = file_bkg_in.Get("images_bkg")
     tree_bkg_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
     nEvents_bkg = tree_bkg_in.GetEntries()
 
@@ -71,7 +73,7 @@ if __name__ == "__main__":
     tree_bkg_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
     tree_bkg_out.SetDirectory(file_bkg_out)
 
-    tree_sig_in = file_in.Get("images_sig")
+    tree_sig_in = file_sig_in.Get("images_sig")
     tree_sig_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
     nEvents_sig = tree_sig_in.GetEntries()
 
@@ -130,6 +132,7 @@ if __name__ == "__main__":
     print("Image data written to the file ", file_sig_out.GetName())
     tree_sig_out.Print()
 
-    file_in.Close()
+    file_bkg_in.Close()
     file_bkg_out.Close()
+    file_sig_in.Close()
     file_sig_out.Close()
