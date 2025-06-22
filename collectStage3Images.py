@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("dir_in", type=str, help="Input directory")
     parser.add_argument("station", type=str, help="Station number")
     parser.add_argument('json_FP', type=str, help="JSON file of false positive events")
+    parser.add_argument('json_FN', type=str, help="JSON file of false negative events")
     parser.add_argument("dir_out", type=str, help="Output directory")
     parser.add_argument("--clean_mode", action="store_true", help="Remove runs that have more than one event")
     args = parser.parse_args()
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     dir_in = args.dir_in
     if not dir_in.endswith("/"):
         dir_in += "/"
-        
+
     station = args.station
 
     json_FP = args.json_FP
@@ -33,6 +34,10 @@ if __name__ == "__main__":
     clean_mode = args.clean_mode
     if clean_mode:
         FP = {k: v for k, v in FP_original.items() if len(v) <= 1}
+
+    json_FN = args.json_FN
+    with open(json_FN,'r') as json_falseNegativeEvents:
+        FN = json.loads(json_falseNegativeEvents.read())
 
     dir_out = args.dir_out
     if not dir_out.endswith("/"):
@@ -52,11 +57,11 @@ if __name__ == "__main__":
     tree_bkg_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
     nEvents_bkg = tree_bkg_in.GetEntries()
 
-    filename_out = f"images_s{station}_3staged_bkg_test.root"
+    filename_bkg_out = f"images_s{station}_3staged_bkg_test.root"
 
     tree_bkg_out = ROOT.TTree("images_bkg", "images_bkg")
 
-    file_out = TFile(dir_out+filename_out, "RECREATE")
+    file_bkg_out = TFile(dir_out+filename_bkg_out, "RECREATE")
 
     tree_bkg_out.Branch("image", "std::vector<float>", image_vector)
     tree_bkg_out.Branch("station_number", station_number, 'station_number/I')
@@ -64,7 +69,25 @@ if __name__ == "__main__":
     tree_bkg_out.Branch("event_number", event_number, 'event_number/I')
     tree_bkg_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_bkg_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
-    tree_bkg_out.SetDirectory(file_out)
+    tree_bkg_out.SetDirectory(file_bkg_out)
+
+    tree_sig_in = file_in.Get("images_sig")
+    tree_sig_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
+    nEvents_sig = tree_sig_in.GetEntries()
+
+    filename_sig_out = f"images_s{station}_3staged_sig_test.root"
+
+    tree_sig_out = ROOT.TTree("images_sig", "images_sig")
+
+    file_sig_out = TFile(dir_out+filename_sig_out, "RECREATE")
+
+    tree_sig_out.Branch("image", "std::vector<float>", image_vector)
+    tree_sig_out.Branch("station_number", station_number, 'station_number/I')
+    tree_sig_out.Branch("run_number", run_number, 'run_number/I')
+    tree_sig_out.Branch("event_number", event_number, 'event_number/I')
+    tree_sig_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+    tree_sig_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_sig_out.SetDirectory(file_sig_out)
 
     for i_event in range(nEvents_bkg):
         tree_bkg_in.GetEntry(i_event)
@@ -83,9 +106,30 @@ if __name__ == "__main__":
                 tree_bkg_out.Fill()
 
     tree_bkg_out.Write()
-
-    print("Image data written to the file ", file_out.GetName())
+    print("Image data written to the file ", file_bkg_out.GetName())
     tree_bkg_out.Print()
 
+    for i_event in range(nEvents_sig):
+        tree_sig_in.GetEntry(i_event)
+
+        E = str(float(tree_sig_in.run_number))
+        run = str(int(tree_sig_in.run_number))
+        event = tree_sig_in.event_number
+
+        if E in FN and run in FN[E] and event in FN[E][run]:
+            continue
+        else:
+            station_number[0] = tree_sig_in.station_number
+            run_number[0] = tree_sig_in.run_number
+            event_number[0] = tree_sig_in.event_number
+            sim_energy[0] = tree_sig_in.sim_energy
+            trigger_time_difference[0] = tree_sig_in.trigger_time_difference
+            tree_sig_out.Fill()
+
+    tree_sig_out.Write()
+    print("Image data written to the file ", file_sig_out.GetName())
+    tree_sig_out.Print()
+
     file_in.Close()
-    file_out.Close()
+    file_bkg_out.Close()
+    file_sig_out.Close()
