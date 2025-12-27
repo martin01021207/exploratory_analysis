@@ -64,6 +64,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   int event_number;
   float sim_energy;
   //float trigger_time_difference;
+  float true_radius;
+  float true_theta;
+  float true_phi;
+  int true_source_theta;
+  int true_source_phi;
 
   for (unsigned int i = 0; i < vars.size(); i++)
   {
@@ -76,6 +81,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   reader->AddSpectator("event_number", &event_number);
   reader->AddSpectator("sim_energy", &sim_energy);
   //reader->AddSpectator("trigger_time_difference", &trigger_time_difference);
+  reader->AddSpectator("true_radius", &true_radius);
+  reader->AddSpectator("true_theta", &true_theta);
+  reader->AddSpectator("true_phi", &true_phi);
+  reader->AddSpectator("true_source_theta", &true_source_theta);
+  reader->AddSpectator("true_source_phi", &true_source_phi);
 
   // Book the MVA method
   TString prefix = "TMVA_CNN_Classification";
@@ -106,6 +116,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   tree_S->SetBranchAddress( "event_number", &event_number );
   tree_S->SetBranchAddress( "sim_energy", &sim_energy );
   //tree_S->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
+  tree_S->SetBranchAddress( "true_radius", &true_radius );
+  tree_S->SetBranchAddress( "true_theta", &true_theta );
+  tree_S->SetBranchAddress( "true_phi", &true_phi );
+  tree_S->SetBranchAddress( "true_source_theta", &true_source_theta );
+  tree_S->SetBranchAddress( "true_source_phi", &true_source_phi );
   int nEvents_S = tree_S->GetEntries();
   std::cout << "--- SIGNAL: " << nEvents_S << " events" << std::endl;
 
@@ -126,6 +141,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   tree_B->SetBranchAddress( "event_number", &event_number );
   tree_B->SetBranchAddress( "sim_energy", &sim_energy );
   //tree_B->SetBranchAddress( "trigger_time_difference", &trigger_time_difference );
+  tree_B->SetBranchAddress( "true_radius", &true_radius );
+  tree_B->SetBranchAddress( "true_theta", &true_theta );
+  tree_B->SetBranchAddress( "true_phi", &true_phi );
+  tree_B->SetBranchAddress( "true_source_theta", &true_source_theta );
+  tree_B->SetBranchAddress( "true_source_phi", &true_source_phi );
   int nEvents_B = tree_B->GetEntries();
   std::cout << "--- BACKGROUND: " << nEvents_B << " events" << std::endl;
 
@@ -170,6 +190,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   testTree_S->Branch( "event_number", &event_number, "event_number/I" );
   testTree_S->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
   //testTree_S->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  testTree_S->Branch( "true_radius", &true_radius, "true_radius/F" );
+  testTree_S->Branch( "true_theta", &true_theta, "true_theta/F" );
+  testTree_S->Branch( "true_phi", &true_phi, "true_phi/F" );
+  testTree_S->Branch( "true_source_theta", &true_source_theta, "true_source_theta/I" );
+  testTree_S->Branch( "true_source_phi", &true_source_phi, "true_source_phi/I" );
   testTree_S->SetDirectory(output);
 
   TTree* testTree_B = new TTree("TestTree_B", "TestTree_B");
@@ -180,6 +205,11 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   testTree_B->Branch( "event_number", &event_number, "event_number/I" );
   testTree_B->Branch( "sim_energy", &sim_energy, "sim_energy/F" );
   //testTree_B->Branch( "trigger_time_difference", &trigger_time_difference, "trigger_time_difference/F" );
+  testTree_B->Branch( "true_radius", &true_radius, "true_radius/F" );
+  testTree_B->Branch( "true_theta", &true_theta, "true_theta/F" );
+  testTree_B->Branch( "true_phi", &true_phi, "true_phi/F" );
+  testTree_B->Branch( "true_source_theta", &true_source_theta, "true_source_theta/I" );
+  testTree_B->Branch( "true_source_phi", &true_source_phi, "true_source_phi/I" );
   testTree_B->SetDirectory(output);
 
   TStopwatch sw;
@@ -300,8 +330,10 @@ void stage3_testCNN(int station, TString file_in, TString sim_file_in, TString d
   gPad->SetLogy(1);
 
   canvas.cd();
-  hist_B->Draw();
-  hist_S->Draw("same");
+  //hist_B->Draw();
+  //hist_S->Draw("same");
+  hist_S->Draw();
+  hist_B->Draw("same");
 
   float leg_xMin;
   float leg_xMax;
