@@ -74,12 +74,14 @@ dataLoader = TMVA.DataLoader(f"dataLoader_images_s{station_number}")
 
 imgSize = N * N
 
-inputFileName_sig_train = f"train/images_s{station_number}_sig_train.root"
+#inputFileName_sig_train = f"train/images_s{station_number}_sig_train.root"
+inputFileName_sig_train = f"train/images_s23_sig_train.root"
 inputFile_sig_train = TFile.Open(dir_in+inputFileName_sig_train)
 if inputFile_sig_train is None:
     ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (SIGNAL TRAINING) - exit", inputFileName_sig_train.Data())
 
-inputFileName_sig_test = f"test/images_s{station_number}_sig_test.root"
+#inputFileName_sig_test = f"test/images_s{station_number}_sig_test.root"
+inputFileName_sig_test = f"test/images_s23_sig_test.root"
 inputFile_sig_test = TFile.Open(dir_in+inputFileName_sig_test)
 if inputFile_sig_test is None:
     ROOT.Warning("TMVA_CNN_Classification", "Error opening input file %s (SIGNAL TESTING) - exit", inputFileName_sig_test.Data())
@@ -121,6 +123,11 @@ dataLoader.AddSpectator( "run_number" )
 dataLoader.AddSpectator( "event_number" )
 dataLoader.AddSpectator( "sim_energy" )
 #dataLoader.AddSpectator( "trigger_time_difference" )
+dataLoader.AddSpectator( "true_radius" )
+dataLoader.AddSpectator( "true_theta" )
+dataLoader.AddSpectator( "true_phi" )
+dataLoader.AddSpectator( "true_source_theta" )
+dataLoader.AddSpectator( "true_source_phi" )
 
 
 ####################
