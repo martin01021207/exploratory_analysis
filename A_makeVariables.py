@@ -68,6 +68,11 @@ if __name__ == "__main__":
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
     trigger_time_difference = array('f', [0.])
+    true_radius = array('f', [0.])
+    true_theta = array('f', [0.])
+    true_phi = array('f', [0.])
+    true_source_theta = array('i', [0])
+    true_source_phi = array('i', [0])
 
     nCoincidentPairs_PA = array('i', [0])
     nHighHits_PA = array('i', [0])
@@ -111,6 +116,11 @@ if __name__ == "__main__":
     tree_out.Branch("event_number", event_number, 'event_number/I')
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_out.Branch("true_radius", true_radius, 'true_radius/F')
+    tree_out.Branch("true_theta", true_theta, 'true_theta/F')
+    tree_out.Branch("true_phi", true_phi, 'true_phi/F')
+    tree_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+    tree_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
 
     tree_out.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
     tree_out.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
@@ -156,11 +166,16 @@ if __name__ == "__main__":
     for i_event in range(nEvents):
         tree_in.GetEntry(i_event)
 
-        station_number[0] =  tree_in.station_number
+        station_number[0] = tree_in.station_number
         run_number[0] = tree_in.run_number
         event_number[0] = tree_in.event_number
         sim_energy[0] = tree_in.sim_energy
         trigger_time_difference[0] = tree_in.trigger_time_difference
+        true_radius[0] = tree_in.true_radius
+        true_theta[0] = tree_in.true_theta
+        true_phi[0] = tree_in.true_phi
+        true_source_theta[0] = tree_in.true_source_theta
+        true_source_phi[0] = tree_in.true_source_phi
 
         trace_PA = []
         trace_surface = []
