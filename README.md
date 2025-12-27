@@ -43,7 +43,7 @@ python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <statio
 ```
 ### (2) Simulated Data Input .nur Files
 ```
-python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <station> --isSim --CR --sim_E <energy>
+python stage1_applyHitFilter.py /PATH/TO/INPUT/DIR/ /PATH/TO/OUTPUT/DIR/ <station> --isSim --sim_E <energy>
 ```
 (energy can be  16.00  16.50  17.00  ...)
 ### (3) Output
