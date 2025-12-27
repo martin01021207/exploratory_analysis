@@ -54,6 +54,11 @@ if __name__ == "__main__":
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
     trigger_time_difference = array('f', [0.])
+    true_radius = array('f', [0.])
+    true_theta = array('f', [0.])
+    true_phi = array('f', [0.])
+    true_source_theta = array('i', [0])
+    true_source_phi = array('i', [0])
 
     tree_bkg_in = file_bkg_in.Get("images_bkg")
     tree_bkg_in.SetBranchAddress("image", ROOT.AddressOf(image_vector))
@@ -71,6 +76,11 @@ if __name__ == "__main__":
     tree_bkg_out.Branch("event_number", event_number, 'event_number/I')
     tree_bkg_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_bkg_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_bkg_out.Branch("true_radius", true_radius, 'true_radius/F')
+    tree_bkg_out.Branch("true_theta", true_theta, 'true_theta/F')
+    tree_bkg_out.Branch("true_phi", true_phi, 'true_phi/F')
+    tree_bkg_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+    tree_bkg_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
     tree_bkg_out.SetDirectory(file_bkg_out)
 
     tree_sig_in = file_sig_in.Get("images_sig")
@@ -89,6 +99,11 @@ if __name__ == "__main__":
     tree_sig_out.Branch("event_number", event_number, 'event_number/I')
     tree_sig_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_sig_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_sig_out.Branch("true_radius", true_radius, 'true_radius/F')
+    tree_sig_out.Branch("true_theta", true_theta, 'true_theta/F')
+    tree_sig_out.Branch("true_phi", true_phi, 'true_phi/F')
+    tree_sig_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+    tree_sig_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
     tree_sig_out.SetDirectory(file_sig_out)
 
     for i_event in range(nEvents_bkg):
@@ -105,6 +120,11 @@ if __name__ == "__main__":
                 event_number[0] = tree_bkg_in.event_number
                 sim_energy[0] = tree_bkg_in.sim_energy
                 trigger_time_difference[0] = tree_bkg_in.trigger_time_difference
+                true_radius[0] = tree_bkg_in.true_radius
+                true_theta[0] = tree_bkg_in.true_theta
+                true_phi[0] = tree_bkg_in.true_phi
+                true_source_theta[0] = tree_bkg_in.true_source_theta
+                true_source_phi[0] = tree_bkg_in.true_source_phi
                 tree_bkg_out.Fill()
 
     tree_bkg_out.Write()
@@ -126,6 +146,11 @@ if __name__ == "__main__":
             event_number[0] = tree_sig_in.event_number
             sim_energy[0] = tree_sig_in.sim_energy
             trigger_time_difference[0] = tree_sig_in.trigger_time_difference
+            true_radius[0] = tree_sig_in.true_radius
+            true_theta[0] = tree_sig_in.true_theta
+            true_phi[0] = tree_sig_in.true_phi
+            true_source_theta[0] = tree_sig_in.true_source_theta
+            true_source_phi[0] = tree_sig_in.true_source_phi
             tree_sig_out.Fill()
 
     tree_sig_out.Write()
