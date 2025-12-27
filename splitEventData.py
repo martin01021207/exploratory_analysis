@@ -118,6 +118,11 @@ if __name__ == "__main__":
     event_number = array('i', [0])
     sim_energy = array('f', [0.])
     trigger_time_difference = array('f', [0.])
+    true_radius = array('f', [0.])
+    true_theta = array('f', [0.])
+    true_phi = array('f', [0.])
+    true_source_theta = array('i', [0])
+    true_source_phi = array('i', [0])
 
     file_in = TFile.Open(path_to_file_in)
     tree_in = file_in.Get(treename)
@@ -143,6 +148,11 @@ if __name__ == "__main__":
     tree_out_train.Branch("event_number", event_number, 'event_number/I')
     tree_out_train.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_out_train.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_out_train.Branch("true_radius", true_radius, 'true_radius/F')
+    tree_out_train.Branch("true_theta", true_theta, 'true_theta/F')
+    tree_out_train.Branch("true_phi", true_phi, 'true_phi/F')
+    tree_out_train.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+    tree_out_train.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
     if type == "V":
         tree_out_train.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
         tree_out_train.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
@@ -193,6 +203,11 @@ if __name__ == "__main__":
     tree_out_test.Branch("event_number", event_number, 'event_number/I')
     tree_out_test.Branch("sim_energy", sim_energy, 'sim_energy/F')
     tree_out_test.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_out_test.Branch("true_radius", true_radius, 'true_radius/F')
+    tree_out_test.Branch("true_theta", true_theta, 'true_theta/F')
+    tree_out_test.Branch("true_phi", true_phi, 'true_phi/F')
+    tree_out_test.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+    tree_out_test.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
     if type == "V":
         tree_out_test.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
         tree_out_test.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
@@ -256,6 +271,11 @@ if __name__ == "__main__":
         tree_out_train_2.Branch("event_number", event_number, 'event_number/I')
         tree_out_train_2.Branch("sim_energy", sim_energy, 'sim_energy/F')
         tree_out_train_2.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+        tree_out_train_2.Branch("true_radius", true_radius, 'true_radius/F')
+        tree_out_train_2.Branch("true_theta", true_theta, 'true_theta/F')
+        tree_out_train_2.Branch("true_phi", true_phi, 'true_phi/F')
+        tree_out_train_2.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+        tree_out_train_2.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
         tree_out_train_2.SetDirectory(file_out_train_2)
 
         tree_out_test_2 = TTree(treename_2, treename_2)
@@ -266,6 +286,11 @@ if __name__ == "__main__":
         tree_out_test_2.Branch("event_number", event_number, 'event_number/I')
         tree_out_test_2.Branch("sim_energy", sim_energy, 'sim_energy/F')
         tree_out_test_2.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+        tree_out_test_2.Branch("true_radius", true_radius, 'true_radius/F')
+        tree_out_test_2.Branch("true_theta", true_theta, 'true_theta/F')
+        tree_out_test_2.Branch("true_phi", true_phi, 'true_phi/F')
+        tree_out_test_2.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+        tree_out_test_2.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
         tree_out_test_2.SetDirectory(file_out_test_2)
 
     nCounts = 0
@@ -279,6 +304,11 @@ if __name__ == "__main__":
         event_number[0] = tree_in.event_number
         sim_energy[0] = tree_in.sim_energy
         trigger_time_difference[0] = tree_in.trigger_time_difference
+        true_radius[0] = tree_in.true_radius
+        true_theta[0] = tree_in.true_theta
+        true_phi[0] = tree_in.true_phi
+        true_source_theta[0] = tree_in.true_source_theta
+        true_source_phi[0] = tree_in.true_source_phi
 
         if type == "V":
             nCoincidentPairs_PA[0] = tree_in.nCoincidentPairs_PA
