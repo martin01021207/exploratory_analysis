@@ -50,6 +50,8 @@ nHighHits_inIce_float = array("f", [0.])
 station_number_float = array("f", [0.])
 run_number_float = array("f", [0.])
 event_number_float = array("f", [0.])
+true_source_theta_float = array('f', [0.])
+true_source_phi_float = array('f', [0.])
 
 nCoincidentPairs_PA = array("i", [0])
 nHighHits_PA = array("i", [0])
@@ -74,6 +76,11 @@ run_number = array("i", [0])
 event_number = array("i", [0])
 sim_energy = array("f", [0.])
 #trigger_time_difference = array('f', [0.])
+true_radius = array('f', [0.])
+true_theta = array('f', [0.])
+true_phi = array('f', [0.])
+true_source_theta = array('i', [0])
+true_source_phi = array('i', [0])
 
 reader = TMVA.Reader( "!Color:!Silent" )
 reader.AddVariable( "nCoincidentPairs_PA", nCoincidentPairs_PA_float )
@@ -99,6 +106,11 @@ reader.AddSpectator( "run_number", run_number_float )
 reader.AddSpectator( "event_number", event_number_float )
 reader.AddSpectator( "sim_energy", sim_energy )
 #reader.AddSpectator( "trigger_time_difference", trigger_time_difference )
+reader.AddSpectator( "true_radius", true_radius )
+reader.AddSpectator( "true_theta", true_theta )
+reader.AddSpectator( "true_phi", true_phi )
+reader.AddSpectator( "true_source_theta", true_source_theta_float )
+reader.AddSpectator( "true_source_phi", true_source_phi_float )
 
 prefix = "TMVA_Classification"
 methodName = f"{method} method"
@@ -132,6 +144,11 @@ tree_S.SetBranchAddress( "run_number", run_number )
 tree_S.SetBranchAddress( "event_number", event_number )
 tree_S.SetBranchAddress( "sim_energy", sim_energy )
 #tree_S.SetBranchAddress( "trigger_time_difference", trigger_time_difference )
+tree_S.SetBranchAddress( "true_radius", true_radius )
+tree_S.SetBranchAddress( "true_theta", true_theta )
+tree_S.SetBranchAddress( "true_phi", true_phi )
+tree_S.SetBranchAddress( "true_source_theta", true_source_theta )
+tree_S.SetBranchAddress( "true_source_phi", true_source_phi )
 nEvents_S = tree_S.GetEntries()
 print(f"--- SIGNAL: {nEvents_S} events")
 
@@ -162,6 +179,11 @@ tree_B.SetBranchAddress( "run_number", run_number )
 tree_B.SetBranchAddress( "event_number", event_number )
 tree_B.SetBranchAddress( "sim_energy", sim_energy )
 #tree_B.SetBranchAddress( "trigger_time_difference", trigger_time_difference )
+tree_B.SetBranchAddress( "true_radius", true_radius )
+tree_B.SetBranchAddress( "true_theta", true_theta )
+tree_B.SetBranchAddress( "true_phi", true_phi )
+tree_B.SetBranchAddress( "true_source_theta", true_source_theta )
+tree_B.SetBranchAddress( "true_source_phi", true_source_phi )
 nEvents_B = tree_B.GetEntries()
 print(f"--- BACKGROUND: {nEvents_B} events")
 
@@ -178,9 +200,9 @@ else:
 
 histTitle = f"TMVA response for classifier: {method} (S{station})"
 hist_S = TH1F("hist_S", histTitle, nbin, xMin, xMax)
-hist_S.SetLineColor(ROOT.kAzure+2)
+hist_S.SetLineColorAlpha(ROOT.kAzure+2, 0.5)
 hist_S.SetLineWidth(3)
-hist_S.SetFillColorAlpha(ROOT.kAzure-7, 0.7)
+hist_S.SetFillColorAlpha(ROOT.kAzure-7, 0.2)
 hist_B = TH1F("hist_B", "", nbin, xMin, xMax)
 hist_B.SetLineColor(ROOT.kRed+1)
 hist_B.SetLineWidth(3)
@@ -197,6 +219,11 @@ testTree_S.Branch( "run_number", run_number, "run_number/I" )
 testTree_S.Branch( "event_number", event_number, "event_number/I" )
 testTree_S.Branch( "sim_energy", sim_energy, "sim_energy/F" )
 #testTree_S.Branch( "trigger_time_difference", trigger_time_difference, "trigger_time_difference/F" )
+testTree_S.Branch( "true_radius", true_radius, "true_radius/F" )
+testTree_S.Branch( "true_theta", true_theta, "true_theta/F" )
+testTree_S.Branch( "true_phi", true_phi, "true_phi/F" )
+testTree_S.Branch( "true_source_theta", true_source_theta, "true_source_theta/I" )
+testTree_S.Branch( "true_source_phi", true_source_phi, "true_source_phi/I" )
 
 testTree_B = TTree("TestTree_B", "TestTree_B")
 testTree_B.SetDirectory(output)
@@ -206,6 +233,11 @@ testTree_B.Branch( "run_number", run_number, "run_number/I" )
 testTree_B.Branch( "event_number", event_number, "event_number/I" )
 testTree_B.Branch( "sim_energy", sim_energy, "sim_energy/F" )
 #testTree_B.Branch( "trigger_time_difference", trigger_time_difference, "trigger_time_difference/F" )
+testTree_B.Branch( "true_radius", true_radius, "true_radius/F" )
+testTree_B.Branch( "true_theta", true_theta, "true_theta/F" )
+testTree_B.Branch( "true_phi", true_phi, "true_phi/F" )
+testTree_B.Branch( "true_source_theta", true_source_theta, "true_source_theta/I" )
+testTree_B.Branch( "true_source_phi", true_source_phi, "true_source_phi/I" )
 
 for i_event in range(nEvents_S):
     tree_S.GetEntry(i_event)
@@ -352,9 +384,9 @@ leg.Draw()
 canvas.Print(dir_out+graphFileName, "pdf")
 canvas.Clear("D")
 
-gr_xMin = 0.9
+gr_xMin = 0.96
 gr_xMax = 1.0015
-gr_yMin = 0.7
+gr_yMin = 0.9
 gr_yMax = 1.001
 
 graph.GetXaxis().SetRangeUser(gr_xMin, gr_xMax)
