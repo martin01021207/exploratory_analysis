@@ -339,10 +339,6 @@ if __name__ == "__main__":
                 x = np.array(channel.get_times())
 
                 if isSim:
-                    if not isFAERIE:
-                        # Roll waveform to place the pulse near the center
-                        y = np.roll(y, 800)
-
                     isBadTrace, _, _ = trace_utilities.is_NAN_or_INF(y)
                     if isBadTrace:
                         isBadSimEvent = True
@@ -378,16 +374,18 @@ if __name__ == "__main__":
 
                     for i_channel in sorted_channels:
                         i_channel = int(i_channel)
-                        graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
-                        graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
-                        graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
                         if isSim:
                             if isFAERIE:
                                 graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                             else:
+                                # Roll waveform to place the pulse near the center
+                                traces[i_channel] = np.roll(traces[i_channel], 800)
                                 graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
                         else:
                             graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
+                        graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
+                        graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
+                        graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
                         graph_vector[i_channel].SetTitle(graphTitle)
 
                     tree_out.Fill()
