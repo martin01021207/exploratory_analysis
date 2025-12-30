@@ -236,10 +236,13 @@ if __name__ == "__main__":
     stationHitFilter.begin()
 
     runNumber_sim = 0
+    nEvents_total = 0
     nEvents_FT = 0
     nEvents_RADIANT = 0
+    nEvents_PPS = 0
+    nEvents_UNKNOWN = 0
     nEvents_badSim = 0
-    nEvents_total = 0
+    nEvents_LT = 0
     nEvents_passedHF = 0
     for file in fileList:
         isFAERIE = False
@@ -269,6 +272,10 @@ if __name__ == "__main__":
             channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
             channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.7))
             info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
+
+        eventCollection = list(reader.run())
+        nTotalEventsPerRun = len(eventCollection)
+        nEvents_total += nTotalEventsPerRun
 
         for i_event, event in enumerate(reader.run()):
             station = event.get_station()
@@ -315,6 +322,12 @@ if __name__ == "__main__":
                 elif "RADIANT" in trigger_type:
                     nEvents_RADIANT += 1
                     continue
+                elif "PPS" in trigger_type:
+                    nEvents_PPS += 1
+                    continue
+                elif trigger_type != "LT":
+                    nEvents_UNKNOWN += 1
+                    continue
 
                 if isSelectingEvents:
                     if isExcluded:
@@ -352,7 +365,7 @@ if __name__ == "__main__":
                 nEvents_badSim += 1
                 continue
 
-            nEvents_total += 1
+            nEvents_LT += 1
 
             if len(channels) != nChannels:
                 print(f"S{station_number[0]} R{run_number[0]} Evt{event_number[0]} does not have 24 channels...")
@@ -403,7 +416,16 @@ if __name__ == "__main__":
         print(f"Number of BAD sim events: {nEvents_badSim}")
     else:
         print(f"Station {stationNumber}  Run {runNumber}")
+        print(f"Number of total events: {nEvents_total}")
         print(f"Number of forced trigger events: {nEvents_FT}")
-        print(f"Number of RADIANT trigger events: {nEvents_RADIANT}")
-    print(f"Number of total RF events: {nEvents_total}")
-    print(f"Number of RF events passed the hitFilter: {nEvents_passedHF}")
+        if nEvents_RADIANT:
+            print(f"Number of RADIANT trigger events: {nEvents_RADIANT}")
+        if nEvents_PPS:
+            print(f"Number of PPS trigger events: {nEvents_PPS}")
+        if nEvents_UNKNOWN:
+            print(f"Number of UNKNOWN trigger events: {nEvents_UNKNOWN}")
+    if isSelectingEvents:
+        print(f"Number of selected LT events: {nEvents_LT}")
+    else:
+        print(f"Number of total LT events: {nEvents_LT}")
+    print(f"Number of LT events passed the hitFilter: {nEvents_passedHF}")
