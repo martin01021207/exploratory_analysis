@@ -168,9 +168,13 @@ if __name__ == "__main__":
     else:
         if runNumber is None:
             parser.error("Run number is missing, please specify one for the real data!")
-        highTrigRuns = np.loadtxt(f"/work/hep/martinliu/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
-        if runNumber in highTrigRuns:
-            quit()
+
+        # Skip runs with high trigger rates
+        #highTrigRuns = np.loadtxt(f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
+        #if runNumber in highTrigRuns:
+            #print(f"NOT PROCESSED:  Station {stationNumber}  Run {runNumber}")
+            #quit()
+
         isSelectingEvents = False
         if json_select:
             isSelectingEvents = True
