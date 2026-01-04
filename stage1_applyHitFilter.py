@@ -396,7 +396,7 @@ if __name__ == "__main__":
                                 graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                             else:
                                 # Roll waveform to place the pulse near the center
-                                traces[i_channel] = np.roll(traces[i_channel], 800)
+                                #traces[i_channel] = np.roll(traces[i_channel], 800)
                                 graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
                         else:
                             graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
