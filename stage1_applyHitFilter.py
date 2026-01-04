@@ -153,6 +153,7 @@ if __name__ == "__main__":
     isSim = args.isSim
     sim_E = args.sim_E
 
+    isSelectingEvents = False
     if isSim:
         if sim_E is None:
             parser.error("--sim_E is required when --isSim is used.")
@@ -175,7 +176,6 @@ if __name__ == "__main__":
             #print(f"NOT PROCESSED:  Station {stationNumber}  Run {runNumber}")
             #quit()
 
-        isSelectingEvents = False
         if json_select:
             isSelectingEvents = True
             import json
