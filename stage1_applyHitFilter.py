@@ -417,7 +417,8 @@ if __name__ == "__main__":
 
     if isSim:
         print(f"Station {stationNumber}  Energy {sim_E}")
-        print(f"Number of BAD sim events: {nEvents_badSim}")
+        if nEvents_badSim:
+            print(f"Number of BAD sim events: {nEvents_badSim}")
     else:
         print(f"Station {stationNumber}  Run {runNumber}")
         print(f"Number of total events: {nEvents_total}")
