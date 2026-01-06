@@ -274,7 +274,7 @@ if __name__ == "__main__":
             channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
             channelBandPassFilter.begin()
             channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
-            channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.7))
+            channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
             info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
 
         eventCollection = list(reader.run())
