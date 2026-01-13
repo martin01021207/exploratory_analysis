@@ -325,10 +325,10 @@ if __name__ == "__main__":
             reader.begin(file, mattak_kwargs={'backend': backend})
             channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
             channelResampler.begin()
-            channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
-            channelBandPassFilter.begin()
             channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
             channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
+            channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
+            channelBandPassFilter.begin()
             info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
 
         eventCollection = list(reader.run())
@@ -394,12 +394,12 @@ if __name__ == "__main__":
                     else:
                         if event_number[0] not in eventList:
                             continue
-                channelResampler.run(event, station, det, sampling_rate=5 * units.GHz)
+                channelResampler.run(event, station, det, sampling_rate=10 * units.GHz)
+                channelSinewaveSubtraction.run(event, station, det, peak_prominence=4.0)
                 channelBandPassFilter.run(
                     event, station, det,
                     passband=[0.1 * units.GHz, 0.6 * units.GHz],
                     filter_type='butter', order=10)
-                channelSinewaveSubtraction.run(event, station, det, peak_prominence=4.0)
 
             traces = []
             times = []
