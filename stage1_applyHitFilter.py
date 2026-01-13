@@ -10,6 +10,8 @@ from NuRadioReco.framework.parameters import showerParameters
 from NuRadioReco.detector import detector
 from NuRadioReco.utilities import units, trace_utilities, logging as nulogging
 
+import MakeVariables
+
 import ROOT
 from ROOT import TFile, TTree, TGraph
 
@@ -114,6 +116,57 @@ def get_sim_vertex(station_id, event_object, det, is_FAERIE, vertex_direction=No
     zenith_rel_PA, azimuth_rel_PA = get_zenith_azimuth(np.array([0,0,0]), interaction_vertex_rel_PA)
 
     return (r_rel_PA, zenith_rel_PA, azimuth_rel_PA)
+
+
+def detect_edge_signal(trace, n_chunks=10, edge_threshold_sigma=6.5):
+    """
+    Detect if signal is cut off at edge of trace window.
+
+    Divides trace into chunks and compares edge chunk power to middle chunks.
+    Flags as edge signal if edge power exceeds median + N*std of middle chunks.
+
+    Parameters
+    ----------
+    trace : np.ndarray
+        Voltage trace for the channel
+    n_chunks : int, optional
+        Number of chunks to divide trace into (default: 10)
+    edge_threshold_sigma : float, optional
+        Number of standard deviations above median to flag as edge (default: 6.5)
+
+    Returns
+    -------
+    is_edge : bool - True if edge signal detected
+    """
+    # Divide trace into chunks
+    chunk_size = len(trace) // n_chunks
+    if chunk_size < 10:  # Need reasonable chunk size
+        return False, {}
+
+    # Calculate RMS for each chunk
+    chunk_rms = []
+    for i in range(n_chunks):
+        start = i * chunk_size
+        end = start + chunk_size if i < n_chunks - 1 else len(trace)
+        chunk = trace[start:end]
+        chunk_rms.append(np.std(chunk))
+
+    chunk_rms = np.array(chunk_rms)
+
+    # Get statistics from middle chunks (exclude first and last)
+    middle_chunks = chunk_rms[1:-1]
+    median_middle = np.median(middle_chunks)
+    std_middle = np.std(middle_chunks)
+
+    # Check if either edge exceeds threshold
+    threshold = median_middle + edge_threshold_sigma * std_middle
+
+    first_edge_high = chunk_rms[0] > threshold
+    last_edge_high = chunk_rms[-1] > threshold
+
+    is_edge = first_edge_high or last_edge_high
+
+    return is_edge
 
 
 if __name__ == "__main__":
@@ -248,6 +301,7 @@ if __name__ == "__main__":
     nEvents_badSim = 0
     nEvents_LT = 0
     nEvents_passedHF = 0
+    nEvents_edge = 0
     for file in fileList:
         isFAERIE = False
         if isSim:
@@ -380,14 +434,14 @@ if __name__ == "__main__":
                 if not is_passed_HF:
                     continue
                 else:
-                    nEvents_passedHF += 1
-
                     traces = np.array(traces)
                     times = np.array(times)
                     sorted_indices = channels.argsort()
                     sorted_channels = np.sort(channels)
                     traces = traces[sorted_indices]
                     times = times[sorted_indices]
+
+                    entropy = np.array([])
 
                     for i_channel in sorted_channels:
                         i_channel = int(i_channel)
@@ -399,12 +453,23 @@ if __name__ == "__main__":
                                 #traces[i_channel] = np.roll(traces[i_channel], 800)
                                 graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
                         else:
+                            entropy = np.append( entropy, trace_utilities.get_entropy(traces[i_channel]) )
                             graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                         graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
                         graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
                         graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
                         graph_vector[i_channel].SetTitle(graphTitle)
 
+                    if not isSim:
+                        _, refIndex_inIce, _ = MakeVariables.getReferenceTraceIndices(entropy)
+                        traces_inIce = np.concatenate((traces[0:12], traces[21:24]), axis=0)
+                        csw = trace_utilities.get_coherent_sum(np.delete(traces_inIce, refIndex_inIce, axis=0), traces_inIce[refIndex_inIce])
+                        is_edge = detect_edge_signal(csw)
+                        if is_edge:
+                            nEvents_edge += 1
+                            continue
+
+                    nEvents_passedHF += 1
                     tree_out.Fill()
 
         reader.end()
@@ -429,6 +494,8 @@ if __name__ == "__main__":
             print(f"Number of PPS trigger events: {nEvents_PPS}")
         if nEvents_UNKNOWN:
             print(f"Number of UNKNOWN trigger events: {nEvents_UNKNOWN}")
+        if nEvents_edge:
+            print(f"Number of edge events: {nEvents_edge}")
     if isSelectingEvents:
         print(f"Number of selected LT events: {nEvents_LT}")
     else:
