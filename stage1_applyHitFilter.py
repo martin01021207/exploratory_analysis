@@ -298,6 +298,7 @@ if __name__ == "__main__":
     nEvents_RADIANT = 0
     nEvents_PPS = 0
     nEvents_UNKNOWN = 0
+    nEvents_bad = 0
     nEvents_badSim = 0
     nEvents_LT = 0
     nEvents_passedHF = 0
@@ -423,12 +424,13 @@ if __name__ == "__main__":
                 nEvents_badSim += 1
                 continue
 
-            nEvents_LT += 1
-
             if len(channels) != nChannels:
                 print(f"S{station_number[0]} R{run_number[0]} Evt{event_number[0]} does not have 24 channels...")
+                nEvents_bad += 1
                 continue
             else:
+                nEvents_LT += 1
+
                 # Hit Filter
                 is_passed_HF = stationHitFilter.run(event, station, det)
                 if not is_passed_HF:
@@ -494,6 +496,8 @@ if __name__ == "__main__":
             print(f"Number of PPS trigger events: {nEvents_PPS}")
         if nEvents_UNKNOWN:
             print(f"Number of UNKNOWN trigger events: {nEvents_UNKNOWN}")
+        if nEvents_bad:
+            print(f"Number of bad events: {nEvents_bad}")
         if nEvents_edge:
             print(f"Number of edge events: {nEvents_edge}")
     if isSelectingEvents:
