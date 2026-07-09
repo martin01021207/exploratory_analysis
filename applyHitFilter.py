@@ -1,16 +1,29 @@
+import os
+import re
+import json
+import glob
+import yaml
+import h5py
 import argparse
 import logging
 import datetime
 import numpy as np
+import pandas as pd
 from array import array
+from pathlib import Path
+
+from collections import defaultdict
 
 import NuRadioReco.modules.RNO_G.stationHitFilter
 import NuRadioReco.modules.channelAddCableDelay
+import NuRadioReco.modules.channelResampler
+import NuRadioReco.modules.channelBandPassFilter
+import NuRadioReco.modules.channelSinewaveSubtraction
 from NuRadioReco.framework.parameters import showerParameters
+from NuRadioReco.framework.parameters import stationParameters as stnp
 from NuRadioReco.detector import detector
 from NuRadioReco.utilities import units, trace_utilities, logging as nulogging
-
-import MakeVariables
+from NuRadioReco.modules.interferometricDirectionReconstruction import interferometricDirectionReconstruction
 
 import ROOT
 from ROOT import TFile, TTree, TGraph
@@ -118,55 +131,39 @@ def get_sim_vertex(station_id, event_object, det, is_FAERIE, vertex_direction=No
     return (r_rel_PA, zenith_rel_PA, azimuth_rel_PA)
 
 
-def detect_edge_signal(trace, n_chunks=10, edge_threshold_sigma=6.5):
-    """
-    Detect if signal is cut off at edge of trace window.
+def get_run_key_from_nur(nur_file):
+    base = os.path.basename(nur_file)
+    match = re.search(r"(.+_j\d+)", base)
+    if not match:
+        raise ValueError(f"Could not extract run key from: {nur_file}")
+    return match.group(1)
 
-    Divides trace into chunks and compares edge chunk power to middle chunks.
-    Flags as edge signal if edge power exceeds median + N*std of middle chunks.
 
-    Parameters
-    ----------
-    trace : np.ndarray
-        Voltage trace for the channel
-    n_chunks : int, optional
-        Number of chunks to divide trace into (default: 10)
-    edge_threshold_sigma : float, optional
-        Number of standard deviations above median to flag as edge (default: 6.5)
+def get_run_number(nur_file):
+    base = os.path.basename(nur_file)
+    match = re.search(r"_j(\d+)", base)
+    if not match:
+        raise ValueError(f"Could not extract run number from: {nur_file}")
+    return int(match.group(1))
 
-    Returns
-    -------
-    is_edge : bool - True if edge signal detected
-    """
-    # Divide trace into chunks
-    chunk_size = len(trace) // n_chunks
-    if chunk_size < 10:  # Need reasonable chunk size
-        return False, {}
 
-    # Calculate RMS for each chunk
-    chunk_rms = []
-    for i in range(n_chunks):
-        start = i * chunk_size
-        end = start + chunk_size if i < n_chunks - 1 else len(trace)
-        chunk = trace[start:end]
-        chunk_rms.append(np.std(chunk))
+event_counter = defaultdict(int)
 
-    chunk_rms = np.array(chunk_rms)
 
-    # Get statistics from middle chunks (exclude first and last)
-    middle_chunks = chunk_rms[1:-1]
-    median_middle = np.median(middle_chunks)
-    std_middle = np.std(middle_chunks)
+def get_next_event_id(run):
+    event_id = event_counter[run]
+    event_counter[run] += 1
+    return event_id
 
-    # Check if either edge exceeds threshold
-    threshold = median_middle + edge_threshold_sigma * std_middle
 
-    first_edge_high = chunk_rms[0] > threshold
-    last_edge_high = chunk_rms[-1] > threshold
+def get_csv_from_nur(nur_file):
+    run_key = get_run_key_from_nur(nur_file)
+    return f"{run_key}_ledger.csv"
 
-    is_edge = first_edge_high or last_edge_high
 
-    return is_edge
+def get_hdf5_from_nur(nur_file):
+    run_key = get_run_key_from_nur(nur_file)
+    return f"{run_key}_ledger.hdf5"
 
 
 if __name__ == "__main__":
@@ -174,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("dir_in", type=str, help="Input directory")
     parser.add_argument("dir_out", type=str, help="Output directory")
     parser.add_argument("station_number", type=int, help="Station number")
-    parser.add_argument("--run", type=int, default=None, help="Run number")
+    parser.add_argument("run", type=int, help="Run number")
     parser.add_argument('--json_select', type=str, default=None, help="JSON file of events to select")
     parser.add_argument("--isExcluded", action="store_true", help="Exclude events in JSON")
     parser.add_argument("--uproot", action="store_true", help="Using uproot backend")
@@ -206,6 +203,10 @@ if __name__ == "__main__":
     isSim = args.isSim
     sim_E = args.sim_E
 
+    yaml_config = "/home/hep/martinliu/research/reconstruction/config_projectLDA.yaml"
+    with open(yaml_config, "r") as f:
+        config = yaml.safe_load(f)
+
     isSelectingEvents = False
     if isSim:
         if sim_E is None:
@@ -213,25 +214,24 @@ if __name__ == "__main__":
         else:
             sim_E = sim_E + "eV" if not sim_E.endswith("eV") else sim_E
             sim_E_number = float( sim_E.replace('eV','') )
-        import re
-        import glob
         import NuRadioReco.modules.io.eventReader as readSimData
         treename = "events_sim"
-        filename_out = f"filtered_sim_s{stationNumber}_{sim_E}.root"
-        fileList = glob.glob(dir_in + "*.nur")
+        filename_out = f"filtered_sim_s{stationNumber}_{sim_E}_r{runNumber}.root"
+        path_dir_in = Path(dir_in)
+        run_str = f"j{runNumber:04d}"
+        fileList = sorted(path_dir_in.glob(f"*_{run_str}*.nur"))
     else:
         if runNumber is None:
             parser.error("Run number is missing, please specify one for the real data!")
 
         # Skip runs with high trigger rates
-        #highTrigRuns = np.loadtxt(f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
-        #if runNumber in highTrigRuns:
-            #print(f"NOT PROCESSED:  Station {stationNumber}  Run {runNumber}")
-            #quit()
+        highTrigRuns = np.loadtxt(f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
+        if runNumber in highTrigRuns:
+            print(f"NOT PROCESSED:  Station {stationNumber}  Run {runNumber}")
+            quit()
 
         if json_select:
             isSelectingEvents = True
-            import json
             with open(json_select, 'r') as json_selectEvents:
                 selection = json.loads(json_selectEvents.read())
             if str(runNumber) in selection:
@@ -242,9 +242,6 @@ if __name__ == "__main__":
                 print(f"Run {runNumber} is not in the list, exit now.")
                 quit()
         import NuRadioReco.modules.io.RNO_G.readRNOGDataMattak
-        import NuRadioReco.modules.channelResampler
-        import NuRadioReco.modules.channelBandPassFilter
-        import NuRadioReco.modules.channelSinewaveSubtraction
         treename = "events"
         filename_out = f"filtered_s{stationNumber}_r{runNumber}.root"
         data = f"station{stationNumber}/run{runNumber}"
@@ -263,6 +260,11 @@ if __name__ == "__main__":
     true_phi = array('f', [0.])
     true_source_theta = array('i', [0])
     true_source_phi = array('i', [0])
+    reco_max_corr = array('f', [0.])
+    reco_surf_corr = array('f', [0.])
+    reco_phi = array('f', [0.])
+    reco_theta = array('f', [0.])
+    passed_hit_filter = array('i', [0])
 
     tree_out = ROOT.TTree(treename, treename)
 
@@ -279,6 +281,11 @@ if __name__ == "__main__":
     tree_out.Branch("true_phi", true_phi, 'true_phi/F')
     tree_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
     tree_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+    tree_out.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+    tree_out.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+    tree_out.Branch("reco_phi", reco_phi, 'reco_phi/F')
+    tree_out.Branch("reco_theta", reco_theta, 'reco_theta/F')
+    tree_out.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
     tree_out.SetDirectory(file_out)
     tree_out.SetMaxTreeSize(1000000000000)
 
@@ -292,6 +299,9 @@ if __name__ == "__main__":
     stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
     stationHitFilter.begin()
 
+    reco = interferometricDirectionReconstruction()
+    reco.begin(station_id=stationNumber, config=config, det=det)
+
     runNumber_sim = 0
     nEvents_total = 0
     nEvents_FT = 0
@@ -302,11 +312,17 @@ if __name__ == "__main__":
     nEvents_badSim = 0
     nEvents_LT = 0
     nEvents_passedHF = 0
-    nEvents_edge = 0
     for file in fileList:
         isFAERIE = False
+        isNew = False
+        channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
+        channelResampler.begin()
+        channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
+        channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
+        channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
+        channelBandPassFilter.begin()
         if isSim:
-            filename = file.split("/")[-1]
+            filename = str(file).split("/")[-1]
             if "cos" in filename and "phi" in filename:
                 pattern = r"cos_(-?\d+(?:\.\d+)?)-phi_(-?\d+(?:\.\d+)?)"
                 m = re.search(pattern, filename)
@@ -318,18 +334,18 @@ if __name__ == "__main__":
                 isFAERIE = True
                 direction = None
                 runNumber_sim = int(filename.split(".nur")[0].split("_")[-1])
+            else:
+                isNew = True
+                file_csv = get_csv_from_nur(filename)
+                #file_hdf5 = get_hdf5_from_nur(filename)
+                ledger = pd.read_csv(dir_in + file_csv)
+                runNumber_sim = get_run_number(filename)
             eventID_sim = 0
             reader = readSimData.eventReader()
             reader.begin(file)
         else:
             reader = NuRadioReco.modules.io.RNO_G.readRNOGDataMattak.readRNOGData()
             reader.begin(file, mattak_kwargs={'backend': backend})
-            channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
-            channelResampler.begin()
-            channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
-            channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
-            channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
-            channelBandPassFilter.begin()
             info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
 
         eventCollection = list(reader.run())
@@ -348,10 +364,22 @@ if __name__ == "__main__":
             if isSim:
                 if not station.has_triggered():
                     continue
+
                 run_number[0] = runNumber_sim
                 event_number[0] = eventID_sim
                 sim_energy[0] = sim_E_number
                 trigger_time_difference[0] = 0.
+                if isNew:
+                    event_group_id = event.get_run_number()
+                    row = ledger.loc[ledger["event_group_id"] == event_group_id].iloc[0]
+                    source_theta = row["zenith_deg"]
+                    source_phi = row["azimuth_deg"]
+                    direction = (source_theta, source_phi)
+                    sim_energy[0] = row["energy_eV"]
+                    eventID_sim = get_next_event_id(runNumber_sim)
+                else:
+                    eventID_sim += 1
+
                 radius, theta, phi = get_sim_vertex(station_id, event, det, isFAERIE, direction)
                 true_radius[0] = radius
                 true_theta[0] = theta
@@ -362,7 +390,6 @@ if __name__ == "__main__":
                     source_theta, source_phi = get_zenith_azimuth(np.array([0,0,0]), shower_source)
                 true_source_theta[0] = int(source_theta)
                 true_source_phi[0] = int(source_phi)
-                eventID_sim += 1
             else:
                 run_number[0] = info[i_event].get('run')
                 event_number[0] = info[i_event].get('eventNumber')
@@ -395,12 +422,13 @@ if __name__ == "__main__":
                     else:
                         if event_number[0] not in eventList:
                             continue
-                channelResampler.run(event, station, det, sampling_rate=10 * units.GHz)
-                channelSinewaveSubtraction.run(event, station, det, peak_prominence=4.0)
-                channelBandPassFilter.run(
-                    event, station, det,
-                    passband=[0.1 * units.GHz, 0.6 * units.GHz],
-                    filter_type='butter', order=10)
+
+            channelResampler.run(event, station, det, sampling_rate=10 * units.GHz)
+            channelSinewaveSubtraction.run(event, station, det, peak_prominence=4.0)
+            channelBandPassFilter.run(
+                event, station, det,
+                passband=[0.1 * units.GHz, 0.6 * units.GHz],
+                filter_type='butter', order=10)
 
             traces = []
             times = []
@@ -414,7 +442,6 @@ if __name__ == "__main__":
                     isBadTrace, _, _ = trace_utilities.is_NAN_or_INF(y)
                     if isBadTrace:
                         isBadSimEvent = True
-                        break
 
                 traces.append(y)
                 times.append(x)
@@ -422,7 +449,6 @@ if __name__ == "__main__":
 
             if isBadSimEvent:
                 nEvents_badSim += 1
-                continue
 
             if len(channels) != nChannels:
                 print(f"S{station_number[0]} R{run_number[0]} Evt{event_number[0]} does not have 24 channels...")
@@ -433,49 +459,47 @@ if __name__ == "__main__":
 
                 # Hit Filter
                 is_passed_HF = stationHitFilter.run(event, station, det)
-                if not is_passed_HF:
-                    continue
-                else:
-                    traces = np.array(traces)
-                    times = np.array(times)
-                    sorted_indices = channels.argsort()
-                    sorted_channels = np.sort(channels)
-                    traces = traces[sorted_indices]
-                    times = times[sorted_indices]
+                passed_hit_filter[0] = int(is_passed_HF)
+                nEvents_passedHF += int(is_passed_HF)
 
-                    entropy = np.array([])
+                traces = np.array(traces)
+                times = np.array(times)
+                sorted_indices = channels.argsort()
+                sorted_channels = np.sort(channels)
+                traces = traces[sorted_indices]
+                times = times[sorted_indices]
 
-                    for i_channel in sorted_channels:
-                        i_channel = int(i_channel)
-                        if isSim:
-                            if isFAERIE:
-                                graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
-                            else:
-                                # Roll waveform to place the pulse near the center
-                                #traces[i_channel] = np.roll(traces[i_channel], 800)
-                                graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
+                for i_channel in sorted_channels:
+                    i_channel = int(i_channel)
+                    if isSim:
+                        if isFAERIE or isNew:
+                            graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                         else:
-                            entropy = np.append( entropy, trace_utilities.get_entropy(traces[i_channel]) )
-                            graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
-                        graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
-                        graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
-                        graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
-                        graph_vector[i_channel].SetTitle(graphTitle)
+                            # Roll waveform to place the pulse near the center
+                            #traces[i_channel] = np.roll(traces[i_channel], 800)
+                            graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
+                    else:
+                        graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
+                    graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
+                    graph_vector[i_channel].GetXaxis().SetTitle("time [ns]")
+                    graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
+                    graph_vector[i_channel].SetTitle(graphTitle)
 
-                    if not isSim:
-                        _, refIndex_inIce, _ = MakeVariables.getReferenceTraceIndices(entropy)
-                        traces_inIce = np.concatenate((traces[0:12], traces[21:24]), axis=0)
-                        csw = trace_utilities.get_coherent_sum(np.delete(traces_inIce, refIndex_inIce, axis=0), traces_inIce[refIndex_inIce])
-                        is_edge = detect_edge_signal(csw)
-                        if is_edge:
-                            nEvents_edge += 1
-                            continue
+                event_config = config.copy()
+                corr_map_path = reco.run(event, station, det, event_config,
+                        save_maps=False,
+                        save_pair_maps=False,
+                        save_maps_to=None)
 
-                    nEvents_passedHF += 1
-                    tree_out.Fill()
+                reco_max_corr[0] = station.get_parameter(stnp.rec_max_correlation)
+                reco_surf_corr[0] = station.get_parameter(stnp.rec_surf_corr)
+                reco_phi[0] = np.rad2deg(station.get_parameter(stnp.rec_coord_0))
+                reco_theta[0] = np.rad2deg(station.get_parameter(stnp.rec_coord_1))
+
+                tree_out.Fill()
 
         reader.end()
-        if isSim and not isFAERIE:
+        if isSim and not isFAERIE and not isNew:
             runNumber_sim += 1
 
     file_out.cd()
@@ -498,8 +522,6 @@ if __name__ == "__main__":
             print(f"Number of UNKNOWN trigger events: {nEvents_UNKNOWN}")
         if nEvents_bad:
             print(f"Number of bad events: {nEvents_bad}")
-        if nEvents_edge:
-            print(f"Number of edge events: {nEvents_edge}")
     if isSelectingEvents:
         print(f"Number of selected LT events: {nEvents_LT}")
     else:
