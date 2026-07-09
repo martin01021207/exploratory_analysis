@@ -1,7 +1,7 @@
 import argparse
 from ROOT import TMVA, TFile, TTree, TCut
 
-parser = argparse.ArgumentParser(description='train_BDT')
+parser = argparse.ArgumentParser(description='training BDT')
 parser.add_argument('dir_in', type=str, help="Input directory")
 parser.add_argument('station', type=str, help="Station number")
 args = parser.parse_args()
@@ -67,15 +67,22 @@ dataLoader.AddTree(backgroundTree_train, "Background", backgroundWeight, mycutb,
 dataLoader.AddTree(signalTree_test, "Signal", signalWeight, mycuts, TMVA.Types.kTesting)
 dataLoader.AddTree(backgroundTree_test, "Background", backgroundWeight, mycutb, TMVA.Types.kTesting)
 
+dataLoader.AddVariable( "passed_hit_filter"     , 'I')
+dataLoader.AddVariable( "reco_max_corr"         , 'F')
+dataLoader.AddVariable( "reco_surf_corr"        , 'F')
+#dataLoader.AddVariable( "reco_phi"              , 'F')
+#dataLoader.AddVariable( "reco_theta"            , 'F')
+dataLoader.AddVariable( "maxP2P_PA"             , 'F')
+
 dataLoader.AddVariable( "nCoincidentPairs_PA"   , 'I')
 dataLoader.AddVariable( "nHighHits_PA"          , 'I')
-dataLoader.AddVariable( "averageSNR_PA"         , 'F')
-dataLoader.AddVariable( "averageKurtosis_PA"    , 'F')
-dataLoader.AddVariable( "averageEntropy_PA"     , 'F')
-dataLoader.AddVariable( "impulsivity_PA"        , 'F')
-dataLoader.AddVariable( "coherentSNR_PA"        , 'F')
-dataLoader.AddVariable( "coherentKurtosis_PA"   , 'F')
-dataLoader.AddVariable( "coherentEntropy_PA"    , 'F')
+#dataLoader.AddVariable( "averageSNR_PA"         , 'F')
+#dataLoader.AddVariable( "averageKurtosis_PA"    , 'F')
+#dataLoader.AddVariable( "averageEntropy_PA"     , 'F')
+#dataLoader.AddVariable( "impulsivity_PA"        , 'F')
+#dataLoader.AddVariable( "coherentSNR_PA"        , 'F')
+#dataLoader.AddVariable( "coherentKurtosis_PA"   , 'F')
+#dataLoader.AddVariable( "coherentEntropy_PA"    , 'F')
 
 dataLoader.AddVariable( "nCoincidentPairs_inIce", 'I')
 dataLoader.AddVariable( "nHighHits_inIce"       , 'I')
@@ -110,34 +117,9 @@ dataLoader.AddSpectator( "true_source_theta" )
 dataLoader.AddSpectator( "true_source_phi" )
 
 
-####################
-### Book methods ###
-####################
-
-### LD ###
-factory.BookMethod(dataLoader, TMVA.Types.kLD, "LD",
-                   'H:!V:VarTransform=None:CreateMVAPdfs:PDFInterpolMVAPdf=Spline2:NbinsMVAPdf=50:NsmoothMVAPdf=10')
-
-### BDT ###
+### Book BDT ###
 factory.BookMethod(dataLoader, TMVA.Types.kBDT, "BDTD",
                    '!H:!V:NTrees=400:MinNodeSize=5%:MaxDepth=3:BoostType=AdaBoost:SeparationType=GiniIndex:nCuts=20:VarTransform=Decorrelate')
-
-### TMVA DNN ###
-# General layout
-layoutString = "Layout=TANH|128,TANH|128,TANH|128,LINEAR"
-# Training strategies
-trainingString1 = "LearningRate=1e-2,Momentum=0.9,ConvergenceSteps=20,BatchSize=100,TestRepetitions=1,WeightDecay=1e-4,Regularization=None,DropConfig=0.0+0.5+0.5+0.5"
-trainingStrategyString = "TrainingStrategy="
-trainingStrategyString += trainingString1 # + "|" + trainingString2 + "|" + trainingString3 # for concatenating more training strings
-# General Options
-dnnOptions = "!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM"
-dnnOptions += ":"
-dnnOptions += layoutString
-dnnOptions += ":"
-dnnOptions += trainingStrategyString
-dnnOptions += ":Architecture=CPU"
-dnnMethodName = "TMVA_DNN_CPU"
-factory.BookMethod(dataLoader, TMVA.Types.kDL, dnnMethodName, dnnOptions)
 
 ### Train Methods
 factory.TrainAllMethods()
