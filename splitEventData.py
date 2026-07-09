@@ -1,4 +1,5 @@
 import os
+import json
 import argparse
 import numpy as np
 from array import array
@@ -38,6 +39,10 @@ if __name__ == "__main__":
         print("Need to input an integer of division or an integer of count!")
         quit()
 
+    json_airplane_events = "/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/airplane_events_s23.json"
+    with open(json_airplane_events, 'r') as json_file:
+        airplane_runs = json.loads(json_file.read())
+
     if not os.path.exists(dir_out+"train"):
         os.mkdir(dir_out+"train")
     if not os.path.exists(dir_out+"test"):
@@ -45,6 +50,22 @@ if __name__ == "__main__":
 
     filename_in = path_to_file_in.split("/")[-1]
     filename_out = filename_in.split(".root")[0]
+
+    station_number = array('i', [0])
+    run_number = array('i', [0])
+    event_number = array('i', [0])
+    sim_energy = array('f', [0.])
+    trigger_time_difference = array('f', [0.])
+    true_radius = array('f', [0.])
+    true_theta = array('f', [0.])
+    true_phi = array('f', [0.])
+    true_source_theta = array('i', [0])
+    true_source_phi = array('i', [0])
+    passed_hit_filter = array('i', [0])
+    reco_max_corr = array('f', [0.])
+    reco_surf_corr = array('f', [0.])
+    reco_phi = array('f', [0.])
+    reco_theta = array('f', [0.])
 
     if "filtered" in filename_in:
         type = "F"
@@ -56,6 +77,8 @@ if __name__ == "__main__":
         image_vector = ROOT.std.vector["float"](ntot)
     elif "vars" in filename_in:
         type = "V"
+
+        maxP2P_PA = array('f', [0.])
         nCoincidentPairs_PA = array('i', [0])
         nHighHits_PA = array('i', [0])
         averageRMS_PA = array('f', [0.])
@@ -113,17 +136,6 @@ if __name__ == "__main__":
         elif type == "V":
             treename = "vars_bkg"
 
-    station_number = array('i', [0])
-    run_number = array('i', [0])
-    event_number = array('i', [0])
-    sim_energy = array('f', [0.])
-    trigger_time_difference = array('f', [0.])
-    true_radius = array('f', [0.])
-    true_theta = array('f', [0.])
-    true_phi = array('f', [0.])
-    true_source_theta = array('i', [0])
-    true_source_phi = array('i', [0])
-
     file_in = TFile.Open(path_to_file_in)
     tree_in = file_in.Get(treename)
     tree_in.GetEntry(0)
@@ -153,7 +165,13 @@ if __name__ == "__main__":
     tree_out_train.Branch("true_phi", true_phi, 'true_phi/F')
     tree_out_train.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
     tree_out_train.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+    tree_out_train.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+    tree_out_train.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+    tree_out_train.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+    tree_out_train.Branch("reco_phi", reco_phi, 'reco_phi/F')
+    tree_out_train.Branch("reco_theta", reco_theta, 'reco_theta/F')
     if type == "V":
+        tree_out_train.Branch("maxP2P_PA", maxP2P_PA, 'maxP2P_PA/F')
         tree_out_train.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
         tree_out_train.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
         tree_out_train.Branch("averageRMS_PA", averageRMS_PA, 'averageRMS_PA/F')
@@ -208,7 +226,13 @@ if __name__ == "__main__":
     tree_out_test.Branch("true_phi", true_phi, 'true_phi/F')
     tree_out_test.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
     tree_out_test.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+    tree_out_test.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+    tree_out_test.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+    tree_out_test.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+    tree_out_test.Branch("reco_phi", reco_phi, 'reco_phi/F')
+    tree_out_test.Branch("reco_theta", reco_theta, 'reco_theta/F')
     if type == "V":
+        tree_out_test.Branch("maxP2P_PA", maxP2P_PA, 'maxP2P_PA/F')
         tree_out_test.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
         tree_out_test.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
         tree_out_test.Branch("averageRMS_PA", averageRMS_PA, 'averageRMS_PA/F')
@@ -276,6 +300,11 @@ if __name__ == "__main__":
         tree_out_train_2.Branch("true_phi", true_phi, 'true_phi/F')
         tree_out_train_2.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
         tree_out_train_2.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+        tree_out_train_2.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+        tree_out_train_2.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+        tree_out_train_2.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+        tree_out_train_2.Branch("reco_phi", reco_phi, 'reco_phi/F')
+        tree_out_train_2.Branch("reco_theta", reco_theta, 'reco_theta/F')
         tree_out_train_2.SetDirectory(file_out_train_2)
 
         tree_out_test_2 = TTree(treename_2, treename_2)
@@ -291,6 +320,11 @@ if __name__ == "__main__":
         tree_out_test_2.Branch("true_phi", true_phi, 'true_phi/F')
         tree_out_test_2.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
         tree_out_test_2.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+        tree_out_test_2.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+        tree_out_test_2.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+        tree_out_test_2.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+        tree_out_test_2.Branch("reco_phi", reco_phi, 'reco_phi/F')
+        tree_out_test_2.Branch("reco_theta", reco_theta, 'reco_theta/F')
         tree_out_test_2.SetDirectory(file_out_test_2)
 
     nCounts = 0
@@ -309,8 +343,20 @@ if __name__ == "__main__":
         true_phi[0] = tree_in.true_phi
         true_source_theta[0] = tree_in.true_source_theta
         true_source_phi[0] = tree_in.true_source_phi
+        passed_hit_filter[0] = tree_in.passed_hit_filter
+        reco_max_corr[0] = tree_in.reco_max_corr
+        reco_surf_corr[0] = tree_in.reco_surf_corr
+        reco_phi[0] = tree_in.reco_phi
+        reco_theta[0] = tree_in.reco_theta
+
+        if not isSim:
+            if str(run_number[0]) in airplane_runs:
+                airplane_events = airplane_runs[str(run_number[0])]
+                if int(event_number[0]) in airplane_events:
+                    continue
 
         if type == "V":
+            maxP2P_PA[0] = tree_in.maxP2P_PA
             nCoincidentPairs_PA[0] = tree_in.nCoincidentPairs_PA
             nHighHits_PA[0] = tree_in.nHighHits_PA
             averageRMS_PA[0] = tree_in.averageRMS_PA
@@ -376,11 +422,11 @@ if __name__ == "__main__":
                 coherentKurtosis_PA = trace_utilities.get_kurtosis(csw)
                 coherentEntropy_PA = trace_utilities.get_entropy(csw)
 
-                if coherentEntropy_PA > 4.5 and coherentKurtosis_PA < 1.3 and coherentSNR_PA < 3.5 and impulsivity_PA < 0.18:
+                if coherentEntropy_PA > 4 and coherentSNR_PA < 4.0 and impulsivity_PA < 0.25:
                     extraConditions = True
 
             elif type == "V":
-                if coherentEntropy_PA[0] > 4.5 and coherentKurtosis_PA[0] < 1.3 and coherentSNR_PA[0] < 3.5 and impulsivity_PA[0] < 0.18:
+                if coherentEntropy_PA[0] > 4 and coherentSNR_PA[0] < 4.0 and impulsivity_PA[0] < 0.25:
                     extraConditions = True
 
         if division:
