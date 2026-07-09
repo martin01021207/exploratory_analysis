@@ -5,13 +5,13 @@ from ROOT import TFile, TTree, TCanvas, TPad, TH1F, TGraph, TLine, TLegend
 from array import array
 import json
 
-parser = argparse.ArgumentParser(description='test_BDT')
+parser = argparse.ArgumentParser(description='test BDT')
 parser.add_argument('station', type=str, help="Station number")
 parser.add_argument('file_in', type=str, help="Path to the input file")
 parser.add_argument('sim_file_in', type=str, help="Path to the input simulation file")
 parser.add_argument('dir_trained', type=str, help="Path to the directory of trained BDT weights")
 parser.add_argument('dir_out', type=str, help="Output directory")
-parser.add_argument('--target_eff', type=float, default=0.9999, help="Target signal efficiency")
+parser.add_argument('--target_cut', type=float, default=0.1, help="Target BDT cut")
 args = parser.parse_args()
 
 station = args.station
@@ -27,14 +27,21 @@ if not dir_out.endswith("/"):
 station_str = f"s{station}"
 
 # Target signal efficiency
-targetEff = args.target_eff
+targetCut = args.target_cut
+
+highTrigRuns = list(np.loadtxt(f"/Users/martin/Desktop/research/analysis_pipeline/highTrigRuns_s{station}.txt", dtype=int))
+
+if station == "13":
+    run_max_2022 = 1084
+elif station == "23":
+    run_max_2022 = 1135
 
 # Method
 method = "BDTD"
 
-jsonFileName = "falsePositiveEvents_vars_" + station_str + ".json"
-targetFileName = "testTree_vars_" + station_str + ".root"
-graphFileName = "testedResults_vars_" + station_str + ".pdf"
+jsonFileName = "falsePositiveEvents_vars_" + station_str + f"_{method}.json"
+targetFileName = "testTree_vars_" + station_str + f"_{method}.root"
+graphFileName = "testedResults_vars_" + station_str + f"_{method}.pdf"
 
 TMVA = ROOT.TMVA
 
@@ -43,16 +50,19 @@ TMVA.Tools.Instance()
 
 print("==> Start BDT testing")
 
+passed_hit_filter_float = array("f", [0.])
 nCoincidentPairs_PA_float = array("f", [0.])
 nHighHits_PA_float = array("f", [0.])
 nCoincidentPairs_inIce_float = array("f", [0.])
 nHighHits_inIce_float = array("f", [0.])
+
 station_number_float = array("f", [0.])
 run_number_float = array("f", [0.])
 event_number_float = array("f", [0.])
-true_source_theta_float = array('f', [0.])
-true_source_phi_float = array('f', [0.])
+true_source_theta_float = array("f", [0.])
+true_source_phi_float = array("f", [0.])
 
+passed_hit_filter = array("i", [0])
 nCoincidentPairs_PA = array("i", [0])
 nHighHits_PA = array("i", [0])
 averageSNR_PA = array("f", [0.])
@@ -82,16 +92,28 @@ true_phi = array('f', [0.])
 true_source_theta = array('i', [0])
 true_source_phi = array('i', [0])
 
+reco_max_corr = array('f', [0.])
+reco_surf_corr = array('f', [0.])
+reco_phi = array('f', [0.])
+reco_theta = array('f', [0.])
+maxP2P_PA = array('f', [0.])
+
 reader = TMVA.Reader( "!Color:!Silent" )
+reader.AddVariable( "passed_hit_filter", passed_hit_filter_float )
+reader.AddVariable( "reco_max_corr", reco_max_corr )
+reader.AddVariable( "reco_surf_corr", reco_surf_corr )
+#reader.AddVariable( "reco_phi", reco_phi )
+#reader.AddVariable( "reco_theta", reco_theta )
+reader.AddVariable( "maxP2P_PA", maxP2P_PA )
 reader.AddVariable( "nCoincidentPairs_PA", nCoincidentPairs_PA_float )
 reader.AddVariable( "nHighHits_PA", nHighHits_PA_float )
-reader.AddVariable( "averageSNR_PA", averageSNR_PA )
-reader.AddVariable( "averageKurtosis_PA", averageKurtosis_PA )
-reader.AddVariable( "averageEntropy_PA", averageEntropy_PA )
-reader.AddVariable( "impulsivity_PA", impulsivity_PA )
-reader.AddVariable( "coherentSNR_PA", coherentSNR_PA )
-reader.AddVariable( "coherentKurtosis_PA", coherentKurtosis_PA )
-reader.AddVariable( "coherentEntropy_PA", coherentEntropy_PA )
+#reader.AddVariable( "averageSNR_PA", averageSNR_PA )
+#reader.AddVariable( "averageKurtosis_PA", averageKurtosis_PA )
+#reader.AddVariable( "averageEntropy_PA", averageEntropy_PA )
+#reader.AddVariable( "impulsivity_PA", impulsivity_PA )
+#reader.AddVariable( "coherentSNR_PA", coherentSNR_PA )
+#reader.AddVariable( "coherentKurtosis_PA", coherentKurtosis_PA )
+#reader.AddVariable( "coherentEntropy_PA", coherentEntropy_PA )
 reader.AddVariable( "nCoincidentPairs_inIce", nCoincidentPairs_inIce_float )
 reader.AddVariable( "nHighHits_inIce", nHighHits_inIce_float )
 reader.AddVariable( "averageSNR_inIce", averageSNR_inIce )
@@ -101,6 +123,7 @@ reader.AddVariable( "impulsivity_inIce", impulsivity_inIce )
 reader.AddVariable( "coherentSNR_inIce", coherentSNR_inIce )
 reader.AddVariable( "coherentKurtosis_inIce", coherentKurtosis_inIce )
 reader.AddVariable( "coherentEntropy_inIce", coherentEntropy_inIce )
+
 reader.AddSpectator( "station_number", station_number_float )
 reader.AddSpectator( "run_number", run_number_float )
 reader.AddSpectator( "event_number", event_number_float )
@@ -118,18 +141,22 @@ weightfile = dir_trained + prefix + "_" + method + ".weights.xml"
 reader.BookMVA( methodName, weightfile )
 
 input_sig = TFile.Open(sim_file_in)
-print(f"--- TMVA Classification App    : Using input sim file: {input_sig.GetName()}")
-
 tree_S = input_sig.Get(f"vars_sig")
+tree_S.SetBranchAddress( "passed_hit_filter", passed_hit_filter )
+tree_S.SetBranchAddress( "reco_max_corr", reco_max_corr )
+tree_S.SetBranchAddress( "reco_surf_corr", reco_surf_corr )
+#tree_S.SetBranchAddress( "reco_phi", reco_phi )
+#tree_S.SetBranchAddress( "reco_theta", reco_theta )
+tree_S.SetBranchAddress( "maxP2P_PA", maxP2P_PA )
 tree_S.SetBranchAddress( "nCoincidentPairs_PA", nCoincidentPairs_PA )
 tree_S.SetBranchAddress( "nHighHits_PA", nHighHits_PA )
-tree_S.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
-tree_S.SetBranchAddress( "averageKurtosis_PA", averageKurtosis_PA )
-tree_S.SetBranchAddress( "averageEntropy_PA", averageEntropy_PA )
-tree_S.SetBranchAddress( "impulsivity_PA", impulsivity_PA )
-tree_S.SetBranchAddress( "coherentSNR_PA", coherentSNR_PA )
-tree_S.SetBranchAddress( "coherentKurtosis_PA", coherentKurtosis_PA )
-tree_S.SetBranchAddress( "coherentEntropy_PA", coherentEntropy_PA )
+#tree_S.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
+#tree_S.SetBranchAddress( "averageKurtosis_PA", averageKurtosis_PA )
+#tree_S.SetBranchAddress( "averageEntropy_PA", averageEntropy_PA )
+#tree_S.SetBranchAddress( "impulsivity_PA", impulsivity_PA )
+#tree_S.SetBranchAddress( "coherentSNR_PA", coherentSNR_PA )
+#tree_S.SetBranchAddress( "coherentKurtosis_PA", coherentKurtosis_PA )
+#tree_S.SetBranchAddress( "coherentEntropy_PA", coherentEntropy_PA )
 tree_S.SetBranchAddress( "nCoincidentPairs_inIce", nCoincidentPairs_inIce )
 tree_S.SetBranchAddress( "nHighHits_inIce", nHighHits_inIce )
 tree_S.SetBranchAddress( "averageSNR_inIce", averageSNR_inIce )
@@ -150,21 +177,24 @@ tree_S.SetBranchAddress( "true_phi", true_phi )
 tree_S.SetBranchAddress( "true_source_theta", true_source_theta )
 tree_S.SetBranchAddress( "true_source_phi", true_source_phi )
 nEvents_S = tree_S.GetEntries()
-print(f"--- SIGNAL: {nEvents_S} events")
 
 input_bkg = TFile.Open(file_in)
-print(f"--- TMVA Classification App    : Using input file: {input_bkg.GetName()}")
-
 tree_B = input_bkg.Get(f"vars_bkg")
+tree_B.SetBranchAddress( "passed_hit_filter", passed_hit_filter )
+tree_B.SetBranchAddress( "reco_max_corr", reco_max_corr )
+tree_B.SetBranchAddress( "reco_surf_corr", reco_surf_corr )
+#tree_B.SetBranchAddress( "reco_phi", reco_phi )
+#tree_B.SetBranchAddress( "reco_theta", reco_theta )
+tree_B.SetBranchAddress( "maxP2P_PA", maxP2P_PA )
 tree_B.SetBranchAddress( "nCoincidentPairs_PA", nCoincidentPairs_PA )
 tree_B.SetBranchAddress( "nHighHits_PA", nHighHits_PA )
-tree_B.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
-tree_B.SetBranchAddress( "averageKurtosis_PA", averageKurtosis_PA )
-tree_B.SetBranchAddress( "averageEntropy_PA", averageEntropy_PA )
-tree_B.SetBranchAddress( "impulsivity_PA", impulsivity_PA )
-tree_B.SetBranchAddress( "coherentSNR_PA", coherentSNR_PA )
-tree_B.SetBranchAddress( "coherentKurtosis_PA", coherentKurtosis_PA )
-tree_B.SetBranchAddress( "coherentEntropy_PA", coherentEntropy_PA )
+#tree_B.SetBranchAddress( "averageSNR_PA", averageSNR_PA )
+#tree_B.SetBranchAddress( "averageKurtosis_PA", averageKurtosis_PA )
+#tree_B.SetBranchAddress( "averageEntropy_PA", averageEntropy_PA )
+#tree_B.SetBranchAddress( "impulsivity_PA", impulsivity_PA )
+#tree_B.SetBranchAddress( "coherentSNR_PA", coherentSNR_PA )
+#tree_B.SetBranchAddress( "coherentKurtosis_PA", coherentKurtosis_PA )
+#tree_B.SetBranchAddress( "coherentEntropy_PA", coherentEntropy_PA )
 tree_B.SetBranchAddress( "nCoincidentPairs_inIce", nCoincidentPairs_inIce )
 tree_B.SetBranchAddress( "nHighHits_inIce", nHighHits_inIce )
 tree_B.SetBranchAddress( "averageSNR_inIce", averageSNR_inIce )
@@ -185,25 +215,24 @@ tree_B.SetBranchAddress( "true_phi", true_phi )
 tree_B.SetBranchAddress( "true_source_theta", true_source_theta )
 tree_B.SetBranchAddress( "true_source_phi", true_source_phi )
 nEvents_B = tree_B.GetEntries()
-print(f"--- BACKGROUND: {nEvents_B} events")
 
 output = TFile( dir_out+targetFileName, "RECREATE" )
 output.cd()
 
 nbin = 100
 if method == "BDTD":
-    xMin = -0.8
-    xMax = 0.8
+    xMin = -1.0
+    xMax = 1.0
 else:
     xMin = -0.1
     xMax = 1.1
 
 histTitle = f"TMVA response for classifier: {method} (S{station})"
-hist_S = TH1F("hist_S", histTitle, nbin, xMin, xMax)
+hist_S = TH1F("hist_S", "", nbin, xMin, xMax)
 hist_S.SetLineColorAlpha(ROOT.kAzure+2, 0.5)
 hist_S.SetLineWidth(3)
 hist_S.SetFillColorAlpha(ROOT.kAzure-7, 0.2)
-hist_B = TH1F("hist_B", "", nbin, xMin, xMax)
+hist_B = TH1F("hist_B", histTitle, nbin, xMin, xMax)
 hist_B.SetLineColor(ROOT.kRed+1)
 hist_B.SetLineWidth(3)
 hist_B.SetFillColor(ROOT.kRed+1)
@@ -239,8 +268,10 @@ testTree_B.Branch( "true_phi", true_phi, "true_phi/F" )
 testTree_B.Branch( "true_source_theta", true_source_theta, "true_source_theta/I" )
 testTree_B.Branch( "true_source_phi", true_source_phi, "true_source_phi/I" )
 
+print(f"--- TMVA Classification App    : Using input sim file: {input_sig.GetName()}")
 for i_event in range(nEvents_S):
     tree_S.GetEntry(i_event)
+    passed_hit_filter_float[0] = passed_hit_filter[0]
     nCoincidentPairs_PA_float[0] = nCoincidentPairs_PA[0]
     nHighHits_PA_float[0] = nHighHits_PA[0]
     nCoincidentPairs_inIce_float[0] = nCoincidentPairs_inIce[0]
@@ -251,10 +282,13 @@ for i_event in range(nEvents_S):
     EvaluateMVA[0] = reader.EvaluateMVA(methodName)
     testTree_S.Fill()
     hist_S.Fill(EvaluateMVA[0])
+print(f"--- SIGNAL: {testTree_S.GetEntries()} events")
 print("--- End of event loop (SIGNAL)")
 
+print(f"--- TMVA Classification App    : Using input file: {input_bkg.GetName()}")
 for i_event in range(nEvents_B):
     tree_B.GetEntry(i_event)
+    passed_hit_filter_float[0] = passed_hit_filter[0]
     nCoincidentPairs_PA_float[0] = nCoincidentPairs_PA[0]
     nHighHits_PA_float[0] = nHighHits_PA[0]
     nCoincidentPairs_inIce_float[0] = nCoincidentPairs_inIce[0]
@@ -263,8 +297,11 @@ for i_event in range(nEvents_B):
     run_number_float[0] = run_number[0]
     event_number_float[0] = event_number[0]
     EvaluateMVA[0] = reader.EvaluateMVA(methodName)
+    if run_number[0] in highTrigRuns or run_number[0] > run_max_2022:
+        continue
     testTree_B.Fill()
     hist_B.Fill(EvaluateMVA[0])
+print(f"--- BACKGROUND: {testTree_B.GetEntries()} events")
 print("--- End of event loop (BACKGROUND)")
 
 graph = TGraph()
@@ -295,9 +332,8 @@ for cut in cutValues:
 
     #print(f"eff: {eff}    rej: {rej}")
 
-    effDiff = abs(eff - targetEff)
-    if effDiff < minDiff:
-        minDiff = effDiff
+    if abs(cut - targetCut) < 1E-5:
+        targetEff = eff
         cut_selected = cut
         eff_selected = eff
         rej_selected = rej
@@ -333,21 +369,17 @@ ROOT.gStyle.SetOptStat(0)
 ROOT.gPad.SetLogy(1)
 
 canvas.cd()
-hist_S.Draw()
-hist_B.Draw("same")
+hist_B.Draw()
+hist_S.Draw("same")
 
-yMax_cut= hist_S.GetMaximum()*1.5
+yMax_cut= hist_B.GetMaximum()
 vLine_cut = TLine(cut_selected, 0, cut_selected, yMax_cut)
 vLine_cut.SetLineStyle(2)
 vLine_cut.SetLineWidth(2)
-vLine_cut.Draw("same")
+#vLine_cut.Draw("same")
 
-if nEvents_S > nEvents_B:
-    leg_xMin = 0.1
-    leg_xMax = 0.3
-else:
-    leg_xMin = 0.7
-    leg_xMax = 0.9
+leg_xMin = 0.4
+leg_xMax = 0.6
 
 leg_yMin = 0.75
 leg_yMax = 0.9
