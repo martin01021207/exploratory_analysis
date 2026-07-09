@@ -74,6 +74,13 @@ if __name__ == "__main__":
     true_source_theta = array('i', [0])
     true_source_phi = array('i', [0])
 
+    passed_hit_filter = array('i', [0])
+    reco_max_corr = array('f', [0.])
+    reco_surf_corr = array('f', [0.])
+    reco_phi = array('f', [0.])
+    reco_theta = array('f', [0.])
+    maxP2P_PA = array('f', [0.])
+
     nCoincidentPairs_PA = array('i', [0])
     nHighHits_PA = array('i', [0])
     averageRMS_PA = array('f', [0.])
@@ -121,6 +128,13 @@ if __name__ == "__main__":
     tree_out.Branch("true_phi", true_phi, 'true_phi/F')
     tree_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
     tree_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+
+    tree_out.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+    tree_out.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
+    tree_out.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+    tree_out.Branch("reco_phi", reco_phi, 'reco_phi/F')
+    tree_out.Branch("reco_theta", reco_theta, 'reco_theta/F')
+    tree_out.Branch("maxP2P_PA", maxP2P_PA, 'maxP2P_PA/F')
 
     tree_out.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
     tree_out.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
@@ -177,6 +191,12 @@ if __name__ == "__main__":
         true_source_theta[0] = tree_in.true_source_theta
         true_source_phi[0] = tree_in.true_source_phi
 
+        passed_hit_filter[0] = tree_in.passed_hit_filter
+        reco_max_corr[0] = tree_in.reco_max_corr
+        reco_surf_corr[0] = tree_in.reco_surf_corr
+        reco_phi[0] = tree_in.reco_phi
+        reco_theta[0] = tree_in.reco_theta
+
         trace_PA = []
         trace_surface = []
         trace_inIce = []
@@ -188,6 +208,7 @@ if __name__ == "__main__":
         RPR = np.array([])
         kurtosis = np.array([])
         entropy = np.array([])
+        p2p_PA = np.array([])
 
         sumRMS_PA = 0
         sumSNR_PA = 0
@@ -214,7 +235,7 @@ if __name__ == "__main__":
 
             # Calculations: RMS, SNR, Kurtosis, Entropy
             RMS = np.append( RMS, trace_utilities.get_split_trace_noise_RMS(y) )
-            SNR = np.append( SNR, trace_utilities.get_signal_to_noise_ratio(y, RMS[i_channel]) )
+            SNR = np.append( SNR, trace_utilities.get_signal_to_noise_ratio(y, RMS[i_channel], 100) )
             RPR = np.append( RPR, trace_utilities.get_root_power_ratio(y, x, RMS[i_channel]) )
             kurtosis = np.append( kurtosis, trace_utilities.get_kurtosis(y) )
             entropy = np.append( entropy, trace_utilities.get_entropy(y) )
@@ -226,6 +247,7 @@ if __name__ == "__main__":
                 sumRPR_PA += RPR[i_channel]
                 sumKurtosis_PA += kurtosis[i_channel]
                 sumEntropy_PA += entropy[i_channel]
+                p2p_PA = np.append( p2p_PA, trace_utilities.peak_to_peak_amplitudes(y, 100) )
 
             if i_channel in inIceChannels:
                 trace_inIce.append(y)
@@ -252,6 +274,8 @@ if __name__ == "__main__":
         trace_inIce = np.array(trace_inIce)
         trace_HF = np.array(trace_HF)
         times_HF = np.array(times_HF)
+
+        maxP2P_PA[0] = np.amax(p2p_PA)
 
         ### Hit Filter ###
         HF.set_up(trace_HF, times_HF, RMS_HF)
@@ -296,7 +320,7 @@ if __name__ == "__main__":
         csw = trace_utilities.get_coherent_sum( np.delete(trace_PA, refIndex_PA, axis=0), trace_PA[refIndex_PA] )
         impulsivity_PA[0] = trace_utilities.get_impulsivity(csw)
         coherentRMS_PA[0] = trace_utilities.get_split_trace_noise_RMS(csw)
-        coherentSNR_PA[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_PA[0])
+        coherentSNR_PA[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_PA[0], 100)
         coherentKurtosis_PA[0] = trace_utilities.get_kurtosis(csw)
         coherentEntropy_PA[0] = trace_utilities.get_entropy(csw)
 
@@ -304,7 +328,7 @@ if __name__ == "__main__":
         csw = trace_utilities.get_coherent_sum( np.delete(trace_inIce, refIndex_inIce, axis=0), trace_inIce[refIndex_inIce] )
         impulsivity_inIce[0] = trace_utilities.get_impulsivity(csw)
         coherentRMS_inIce[0] = trace_utilities.get_split_trace_noise_RMS(csw)
-        coherentSNR_inIce[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_inIce[0])
+        coherentSNR_inIce[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_inIce[0], 100)
         coherentKurtosis_inIce[0] = trace_utilities.get_kurtosis(csw)
         coherentEntropy_inIce[0] = trace_utilities.get_entropy(csw)
 
@@ -312,7 +336,7 @@ if __name__ == "__main__":
         csw = trace_utilities.get_coherent_sum( np.delete(trace_surface, refIndex_surface, axis=0), trace_surface[refIndex_surface] )
         impulsivity_surface[0] = trace_utilities.get_impulsivity(csw)
         coherentRMS_surface[0] = trace_utilities.get_split_trace_noise_RMS(csw)
-        coherentSNR_surface[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_surface[0])
+        coherentSNR_surface[0] = trace_utilities.get_signal_to_noise_ratio(csw, coherentRMS_surface[0], 100)
         coherentKurtosis_surface[0] = trace_utilities.get_kurtosis(csw)
         coherentEntropy_surface[0] = trace_utilities.get_entropy(csw)
 
