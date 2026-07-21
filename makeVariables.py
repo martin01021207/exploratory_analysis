@@ -380,3 +380,5 @@ if __name__ == "__main__":
 
     file_in.Close()
     file_out.Close()
+
+    print(f"Finished saving variables into file: {filename_out}")
