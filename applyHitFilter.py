@@ -1,7 +1,8 @@
 import os
 import re
-import json
 import glob
+import math
+import json
 import yaml
 import h5py
 import argparse
@@ -15,15 +16,18 @@ from pathlib import Path
 from collections import defaultdict
 
 import NuRadioReco.modules.RNO_G.stationHitFilter
+import NuRadioReco.modules.RNO_G.channelBlockOffsetFitter
+import NuRadioReco.modules.RNO_G.channelGlitchDetector
+import NuRadioReco.modules.RNO_G.hardwareResponseIncorporator
 import NuRadioReco.modules.channelAddCableDelay
 import NuRadioReco.modules.channelResampler
 import NuRadioReco.modules.channelBandPassFilter
 import NuRadioReco.modules.channelSinewaveSubtraction
+import NuRadioReco.modules.interferometricDirectionReconstruction3D
 from NuRadioReco.framework.parameters import showerParameters
 from NuRadioReco.framework.parameters import stationParameters as stnp
 from NuRadioReco.detector import detector
 from NuRadioReco.utilities import units, trace_utilities, logging as nulogging
-from NuRadioReco.modules.interferometricDirectionReconstruction import interferometricDirectionReconstruction
 
 import ROOT
 from ROOT import TFile, TTree, TGraph
@@ -131,9 +135,13 @@ def get_sim_vertex(station_id, event_object, det, is_FAERIE, vertex_direction=No
     return (r_rel_PA, zenith_rel_PA, azimuth_rel_PA)
 
 
+def get_interaction_type(interaction_type):
+    return {"cc": 0, "nc": 1}[interaction_type]
+
+
 def get_run_key_from_nur(nur_file):
     base = os.path.basename(nur_file)
-    match = re.search(r"(.+_j\d+)", base)
+    match = re.search(r"(.+_[jc]\d+)", base)
     if not match:
         raise ValueError(f"Could not extract run key from: {nur_file}")
     return match.group(1)
@@ -141,7 +149,7 @@ def get_run_key_from_nur(nur_file):
 
 def get_run_number(nur_file):
     base = os.path.basename(nur_file)
-    match = re.search(r"_j(\d+)", base)
+    match = re.search(r"_[jc](\d+)", base)
     if not match:
         raise ValueError(f"Could not extract run number from: {nur_file}")
     return int(match.group(1))
@@ -203,9 +211,12 @@ if __name__ == "__main__":
     isSim = args.isSim
     sim_E = args.sim_E
 
-    yaml_config = "/home/hep/martinliu/research/reconstruction/config_projectLDA.yaml"
-    with open(yaml_config, "r") as f:
+    reco_config = "/home/hep/martinliu/research/reconstruction/reco_3D/reco.yaml"
+    with open(reco_config, "r") as f:
         config = yaml.safe_load(f)
+    config["station_id"] = stationNumber
+    config["time_delay_tables"] = "/mnt/nrdstor/hep/martinliu/data/reconstruction/time_delay_tables"
+    config["validation"] = True
 
     isSelectingEvents = False
     if isSim:
@@ -218,8 +229,10 @@ if __name__ == "__main__":
         treename = "events_sim"
         filename_out = f"filtered_sim_s{stationNumber}_{sim_E}_r{runNumber}.root"
         path_dir_in = Path(dir_in)
-        run_str = f"j{runNumber:04d}"
-        fileList = sorted(path_dir_in.glob(f"*_{run_str}*.nur"))
+        run_str = f"{runNumber:04d}"
+        fileList = sorted(path_dir_in.glob(f"*_j{run_str}*.nur"))
+        if not fileList:
+            fileList = sorted(path_dir_in.glob(f"*_c{run_str}*.nur"))
     else:
         if runNumber is None:
             parser.error("Run number is missing, please specify one for the real data!")
@@ -229,6 +242,16 @@ if __name__ == "__main__":
         if runNumber in highTrigRuns:
             print(f"NOT PROCESSED:  Station {stationNumber}  Run {runNumber}")
             quit()
+
+        # Airplane events
+        json_airplane_events = f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/airplane_events_s{stationNumber}.json"
+        with open(json_airplane_events, 'r') as json_file:
+            airplane_runs = json.loads(json_file.read())
+
+        # High wind events
+        json_high_wind_events = f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/high_wind_events_s{stationNumber}.json"
+        with open(json_high_wind_events, 'r') as json_file:
+            high_wind_runs = json.loads(json_file.read())
 
         if json_select:
             isSelectingEvents = True
@@ -250,56 +273,105 @@ if __name__ == "__main__":
 
     nChannels = 24
     graph_vector = ROOT.std.vector["TGraph"](nChannels)
+
     station_number = array('i', [0])
     run_number = array('i', [0])
     event_number = array('i', [0])
+
     sim_energy = array('f', [0.])
-    trigger_time_difference = array('f', [0.])
+    shower_energy = array('f', [0.])
+    inelasticity = array('f', [0.])
+    interaction_type = array('i', [0])
+
+    trigger_time = array('d', [0.])
+
     true_radius = array('f', [0.])
     true_theta = array('f', [0.])
     true_phi = array('f', [0.])
     true_source_theta = array('i', [0])
     true_source_phi = array('i', [0])
-    reco_max_corr = array('f', [0.])
-    reco_surf_corr = array('f', [0.])
-    reco_phi = array('f', [0.])
-    reco_theta = array('f', [0.])
+
+    reco_max_corr = array('f', [np.nan])
+    reco_surf_corr_z = array("f", [np.nan])
+    reco_surf_corr_zen = array("f", [np.nan])
+    reco_rho = array('f', [np.nan])
+    reco_phi = array('f', [np.nan])
+    reco_z = array('f', [np.nan])
+
     passed_hit_filter = array('i', [0])
+    nCoincidentPairs_PA = array('i', [0])
+    nHighHits_PA = array('i', [0])
+    nCoincidentPairs_inIce = array('i', [0])
+    nHighHits_inIce = array('i', [0])
+
 
     tree_out = ROOT.TTree(treename, treename)
 
     file_out = TFile(dir_out+filename_out, "RECREATE")
 
     tree_out.Branch("waveform_graphs", "std::vector<TGraph>", graph_vector)
+
     tree_out.Branch("station_number", station_number, 'station_number/I')
     tree_out.Branch("run_number", run_number, 'run_number/I')
     tree_out.Branch("event_number", event_number, 'event_number/I')
+
     tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
-    tree_out.Branch("trigger_time_difference", trigger_time_difference, 'trigger_time_difference/F')
+    tree_out.Branch("shower_energy", shower_energy, 'shower_energy/F')
+    tree_out.Branch("inelasticity", inelasticity, 'inelasticity/F')
+    tree_out.Branch("interaction_type", interaction_type, 'interaction_type/I')
+
+    tree_out.Branch("trigger_time", trigger_time, 'trigger_time/D')
+
     tree_out.Branch("true_radius", true_radius, 'true_radius/F')
     tree_out.Branch("true_theta", true_theta, 'true_theta/F')
     tree_out.Branch("true_phi", true_phi, 'true_phi/F')
     tree_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
     tree_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+
     tree_out.Branch("reco_max_corr", reco_max_corr, 'reco_max_corr/F')
-    tree_out.Branch("reco_surf_corr", reco_surf_corr, 'reco_surf_corr/F')
+    tree_out.Branch("reco_surf_corr_z", reco_surf_corr_z, 'reco_surf_corr_z/F')
+    tree_out.Branch("reco_surf_corr_zen", reco_surf_corr_zen, 'reco_surf_corr_zen/F')
+    tree_out.Branch("reco_rho", reco_rho, 'reco_rho/F')
     tree_out.Branch("reco_phi", reco_phi, 'reco_phi/F')
-    tree_out.Branch("reco_theta", reco_theta, 'reco_theta/F')
+    tree_out.Branch("reco_z", reco_z, 'reco_z/F')
+
     tree_out.Branch("passed_hit_filter", passed_hit_filter, 'passed_hit_filter/I')
+    tree_out.Branch("nCoincidentPairs_PA", nCoincidentPairs_PA, 'nCoincidentPairs_PA/I')
+    tree_out.Branch("nHighHits_PA", nHighHits_PA, 'nHighHits_PA/I')
+    tree_out.Branch("nCoincidentPairs_inIce", nCoincidentPairs_inIce, 'nCoincidentPairs_inIce/I')
+    tree_out.Branch("nHighHits_inIce", nHighHits_inIce, 'nHighHits_inIce/I')
+
     tree_out.SetDirectory(file_out)
     tree_out.SetMaxTreeSize(1000000000000)
 
     det = detector.Detector(source="rnog_mongo")
     det.update(datetime.datetime(2022, 10, 1))
 
+    stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter(complete_time_check=True, complete_hit_check=True)
+    stationHitFilter.begin()
+
+    channelBlockOffsets = NuRadioReco.modules.RNO_G.channelBlockOffsetFitter.channelBlockOffsets()
+    channelBlockOffsets.begin()
+
+    #channelGlitchDetector = NuRadioReco.modules.RNO_G.channelGlitchDetector.channelGlitchDetector(cut_value=0.0)
+    #channelGlitchDetector.begin()
+
     channelCableDelayAdder = NuRadioReco.modules.channelAddCableDelay.channelAddCableDelay()
     channelCableDelayAdder.begin()
 
-    # Initialize Hit Filter
-    stationHitFilter = NuRadioReco.modules.RNO_G.stationHitFilter.stationHitFilter()
-    stationHitFilter.begin()
+    #hardwareResponse = NuRadioReco.modules.RNO_G.hardwareResponseIncorporator.hardwareResponseIncorporator()
+    #hardwareResponse.begin()
 
-    reco = interferometricDirectionReconstruction()
+    channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
+    channelResampler.begin()
+
+    channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
+    channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
+
+    channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
+    channelBandPassFilter.begin()
+
+    reco = NuRadioReco.modules.interferometricDirectionReconstruction3D.InterferometricReco3D()
     reco.begin(station_id=stationNumber, config=config, det=det)
 
     runNumber_sim = 0
@@ -315,12 +387,6 @@ if __name__ == "__main__":
     for file in fileList:
         isFAERIE = False
         isNew = False
-        channelResampler = NuRadioReco.modules.channelResampler.channelResampler()
-        channelResampler.begin()
-        channelSinewaveSubtraction = NuRadioReco.modules.channelSinewaveSubtraction.channelSinewaveSubtraction()
-        channelSinewaveSubtraction.begin(save_filtered_freqs=False, freq_band=(0.1, 0.6))
-        channelBandPassFilter = NuRadioReco.modules.channelBandPassFilter.channelBandPassFilter()
-        channelBandPassFilter.begin()
         if isSim:
             filename = str(file).split("/")[-1]
             if "cos" in filename and "phi" in filename:
@@ -345,30 +411,26 @@ if __name__ == "__main__":
             reader.begin(file)
         else:
             reader = NuRadioReco.modules.io.RNO_G.readRNOGDataMattak.readRNOGData()
-            reader.begin(file, mattak_kwargs={'backend': backend})
+            reader.begin(file, apply_baseline_correction=None, mattak_kwargs={'backend': backend})
             info = reader.get_events_information(keys=["station", "run", "eventNumber", "triggerType", "triggerTime"])
 
         eventCollection = list(reader.run())
-        nTotalEventsPerRun = len(eventCollection)
-        nEvents_total += nTotalEventsPerRun
-
+        nTotalEventsPerFile = len(eventCollection)
+        nEvents_total += nTotalEventsPerFile
         for i_event, event in enumerate(reader.run()):
             station = event.get_station()
             station_id = station.get_id()
-
-            channelCableDelayAdder.run(event, station, det, mode='subtract')
+            station_number[0] = station_id
 
             isBadSimEvent = False
 
-            station_number[0] = station_id
             if isSim:
                 if not station.has_triggered():
                     continue
-
                 run_number[0] = runNumber_sim
                 event_number[0] = eventID_sim
                 sim_energy[0] = sim_E_number
-                trigger_time_difference[0] = 0.
+                trigger_time[0] = -1.0
                 if isNew:
                     event_group_id = event.get_run_number()
                     row = ledger.loc[ledger["event_group_id"] == event_group_id].iloc[0]
@@ -376,8 +438,14 @@ if __name__ == "__main__":
                     source_phi = row["azimuth_deg"]
                     direction = (source_theta, source_phi)
                     sim_energy[0] = row["energy_eV"]
+                    shower_energy[0] = row["shower_energy_eV"]
+                    inelasticity[0] = row["inelasticity"]
+                    interaction_type[0] = get_interaction_type(row["interaction_type"])
                     eventID_sim = get_next_event_id(runNumber_sim)
                 else:
+                    shower_energy[0] = -1.0
+                    inelasticity[0] = -1.0
+                    interaction_type[0] = -1
                     eventID_sim += 1
 
                 radius, theta, phi = get_sim_vertex(station_id, event, det, isFAERIE, direction)
@@ -391,16 +459,6 @@ if __name__ == "__main__":
                 true_source_theta[0] = int(source_theta)
                 true_source_phi[0] = int(source_phi)
             else:
-                run_number[0] = info[i_event].get('run')
-                event_number[0] = info[i_event].get('eventNumber')
-                sim_energy[0] = 0.
-                time_difference = info[i_event].get('triggerTime') - info[0].get('triggerTime')
-                trigger_time_difference[0] = float(time_difference)
-                true_radius[0] = 0.
-                true_theta[0] = 0.
-                true_phi[0] = 0.
-                true_source_theta[0] = 0
-                true_source_phi[0] = 0
                 trigger_type = info[i_event].get('triggerType')
                 if trigger_type == "FORCE":
                     nEvents_FT += 1
@@ -415,6 +473,13 @@ if __name__ == "__main__":
                     nEvents_UNKNOWN += 1
                     continue
 
+                run_number[0] = info[i_event].get('run')
+                event_number[0] = info[i_event].get('eventNumber')
+                sim_energy[0] = -1.0
+                shower_energy[0] = -1.0
+                inelasticity[0] = -1.0
+                interaction_type[0] = -1
+
                 if isSelectingEvents:
                     if isExcluded:
                         if event_number[0] in eventList:
@@ -423,11 +488,41 @@ if __name__ == "__main__":
                         if event_number[0] not in eventList:
                             continue
 
+                if str(run_number[0]) in airplane_runs:
+                    airplane_events = airplane_runs[str(run_number[0])]
+                    if int(event_number[0]) in airplane_events:
+                        continue
+
+                if str(run_number[0]) in high_wind_runs:
+                    high_wind_events = high_wind_runs[str(run_number[0])]
+                    if int(event_number[0]) in high_wind_events:
+                        continue
+
+                ti = info[i_event].get('triggerTime')
+                try:
+                    ti = float(ti)
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(ti):
+                    continue
+                trigger_time[0] = ti
+                true_radius[0] = -1.0
+                true_theta[0] = -1.0
+                true_phi[0] = -1.0
+                true_source_theta[0] = -1
+                true_source_phi[0] = -1
+
+            channelBlockOffsets.run(event, station, det)
+
+            channelCableDelayAdder.run(event, station, det, mode='subtract')
+
             channelResampler.run(event, station, det, sampling_rate=10 * units.GHz)
-            channelSinewaveSubtraction.run(event, station, det, peak_prominence=4.0)
+
+            channelSinewaveSubtraction.run(event, station, det, algorithm="sliding", peak_prominence=4.0)
+
             channelBandPassFilter.run(
                 event, station, det,
-                passband=[0.1 * units.GHz, 0.6 * units.GHz],
+                passband=(0.1 * units.GHz, 0.7 * units.GHz),
                 filter_type='butter', order=10)
 
             traces = []
@@ -459,8 +554,20 @@ if __name__ == "__main__":
 
                 # Hit Filter
                 is_passed_HF = stationHitFilter.run(event, station, det)
+                in_time_window = stationHitFilter.is_in_time_window()
+                over_hit_threshold = stationHitFilter.is_over_hit_threshold()
+
                 passed_hit_filter[0] = int(is_passed_HF)
                 nEvents_passedHF += int(is_passed_HF)
+
+                nCoincidentPairs_PA[0] = int(sum(in_time_window[0]))
+                nHighHits_PA[0] = int(sum(over_hit_threshold[:4]))
+
+                nCoincidentPairs_inIce[0] = nCoincidentPairs_PA[0] + int(
+                    sum(in_time_window[grp][0] for grp in range(1, 4))
+                )
+                nHighHits_inIce[0] = int(sum(over_hit_threshold[:15]))
+
 
                 traces = np.array(traces)
                 times = np.array(times)
@@ -485,22 +592,21 @@ if __name__ == "__main__":
                     graph_vector[i_channel].GetYaxis().SetTitle("amplitude [mV]")
                     graph_vector[i_channel].SetTitle(graphTitle)
 
-                event_config = config.copy()
-                corr_map_path = reco.run(event, station, det, event_config,
-                        save_maps=False,
-                        save_pair_maps=False,
-                        save_maps_to=None)
-
-                reco_max_corr[0] = station.get_parameter(stnp.rec_max_correlation)
-                reco_surf_corr[0] = station.get_parameter(stnp.rec_surf_corr)
-                reco_phi[0] = np.rad2deg(station.get_parameter(stnp.rec_coord_0))
-                reco_theta[0] = np.rad2deg(station.get_parameter(stnp.rec_coord_1))
+                reco_result = reco.run(event, station, det, config)
+                reco_rho[0] = float(reco_result.get("rho", np.nan))
+                reco_phi[0] = float(reco_result.get("phi", np.nan))
+                reco_z[0] = float(reco_result.get("z", np.nan))
+                reco_max_corr[0] = float(reco_result.get("max_corr", np.nan))
+                reco_surf_corr_z[0] = float(reco_result.get("surf_corr_z", np.nan))
+                reco_surf_corr_zen[0] = float(reco_result.get("surf_corr_zen", np.nan))
 
                 tree_out.Fill()
 
         reader.end()
         if isSim and not isFAERIE and not isNew:
             runNumber_sim += 1
+
+    reco.end()
 
     file_out.cd()
     tree_out.Write()
