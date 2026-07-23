@@ -137,7 +137,7 @@ reader.AddVariable( "averageSNR_inIce", averageSNR_inIce )
 reader.AddVariable( "averageKurtosis_inIce", averageKurtosis_inIce )
 reader.AddVariable( "averageEntropy_inIce", averageEntropy_inIce )
 reader.AddVariable( "averageImpulsivity_inIce", averageImpulsivity_inIce )
-reader.AddVariable( "coherentSNR_inIce", coherentSNR_inIce )
+#reader.AddVariable( "coherentSNR_inIce", coherentSNR_inIce )
 reader.AddVariable( "coherentKurtosis_inIce", coherentKurtosis_inIce )
 reader.AddVariable( "coherentEntropy_inIce", coherentEntropy_inIce )
 reader.AddVariable( "coherentImpulsivity_inIce", coherentImpulsivity_inIce )
@@ -475,13 +475,6 @@ canvas.cd()
 hist_B.Draw()
 hist_S.Draw("same")
 
-cut_selected = 0.1
-yMax_cut= hist_B.GetMaximum()*1.5
-vLine_cut = TLine(cut_selected, 0, cut_selected, yMax_cut)
-vLine_cut.SetLineStyle(2)
-vLine_cut.SetLineWidth(2)
-vLine_cut.Draw("same")
-
 leg_xMin = 0.4
 leg_xMax = 0.6
 
@@ -494,6 +487,23 @@ leg_hist.AddEntry(hist_B, "Background", "f")
 leg_hist.Draw()
 
 canvas.Print(dir_out+graphFileName+"(", "pdf")
+canvas.Clear("D")
+
+hist_B.Draw()
+hist_S.Draw("same")
+
+cut_selected = 0.1
+yMax_cut= hist_B.GetMaximum()*1.5
+vLine_cut = TLine(cut_selected, 0, cut_selected, yMax_cut)
+vLine_cut.SetLineStyle(2)
+vLine_cut.SetLineWidth(2)
+vLine_cut.Draw("same")
+
+leg_hist.AddEntry(hist_S, "Signal", "f")
+leg_hist.AddEntry(hist_B, "Background", "f")
+leg_hist.Draw()
+
+canvas.Print(dir_out+graphFileName, "pdf")
 canvas.Clear("D")
 
 grid = TPad("grid", "", 0, 0, 1, 1)
