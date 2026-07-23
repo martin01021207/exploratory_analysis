@@ -50,6 +50,8 @@ event_number_float = array("f", [0.])
 
 interaction_type_float = array("f", [0.])
 
+trigger_time_float = array("f", [0.])
+
 true_source_theta_float = array("f", [0.])
 true_source_phi_float = array("f", [0.])
 
@@ -67,24 +69,24 @@ run_number = array("i", [0])
 event_number = array("i", [0])
 
 sim_energy = array("f", [0.])
-shower_energy = array('f', [0.])
-inelasticity = array('f', [0.])
-interaction_type = array('i', [0])
+shower_energy = array("f", [0.])
+inelasticity = array("f", [0.])
+interaction_type = array("i", [0])
 
-trigger_time = array('d', [0.])
+trigger_time = array("d", [0.])
 
-true_radius = array('f', [0.])
-true_theta = array('f', [0.])
-true_phi = array('f', [0.])
-true_source_theta = array('i', [0])
-true_source_phi = array('i', [0])
+true_radius = array("f", [0.])
+true_theta = array("f", [0.])
+true_phi = array("f", [0.])
+true_source_theta = array("i", [0])
+true_source_phi = array("i", [0])
 
-reco_max_corr = array('f', [np.nan])
+reco_max_corr = array("f", [np.nan])
 reco_surf_corr_z = array("f", [np.nan])
 reco_surf_corr_zen = array("f", [np.nan])
-reco_rho = array('f', [np.nan])
-reco_phi = array('f', [np.nan])
-reco_z = array('f', [np.nan])
+reco_rho = array("f", [np.nan])
+reco_phi = array("f", [np.nan])
+reco_z = array("f", [np.nan])
 
 passed_hit_filter = array("i", [0])
 nCoincidentPairs_PA = array("i", [0])
@@ -149,7 +151,7 @@ reader.AddSpectator( "shower_energy", shower_energy )
 reader.AddSpectator( "inelasticity", inelasticity )
 reader.AddSpectator( "interaction_type", interaction_type_float )
 
-reader.AddSpectator( "trigger_time", trigger_time )
+reader.AddSpectator( "trigger_time", trigger_time_float )
 
 reader.AddSpectator( "true_radius", true_radius )
 reader.AddSpectator( "true_theta", true_theta )
@@ -278,7 +280,7 @@ output.cd()
 
 nbin = 100
 if method == "BDTD":
-    xMin = -1.0
+    xMin = -0.4
     xMax = 1.0
 else:
     xMin = -0.1
@@ -365,6 +367,8 @@ for i_event in range(nEvents_S):
 
     interaction_type_float[0] = interaction_type[0]
 
+    trigger_time[0] = trigger_time_float[0]
+
     true_source_theta_float[0] = true_source_theta[0]
     true_source_phi_float[0] = true_source_phi[0]
 
@@ -390,6 +394,8 @@ for i_event in range(nEvents_B):
     event_number_float[0] = event_number[0]
 
     interaction_type_float[0] = interaction_type[0]
+
+    trigger_time[0] = trigger_time_float[0]
 
     true_source_theta_float[0] = true_source_theta[0]
     true_source_phi_float[0] = true_source_phi[0]
@@ -514,9 +520,9 @@ leg.Draw()
 canvas.Print(dir_out+graphFileName, "pdf")
 canvas.Clear("D")
 
-gr_xMin = 0.96
-gr_xMax = 1.0015
-gr_yMin = 0.9
+gr_xMin = 0.75
+gr_xMax = 0.95
+gr_yMin = 0.7
 gr_yMax = 1.001
 
 graph.GetXaxis().SetRangeUser(gr_xMin, gr_xMax)
