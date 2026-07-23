@@ -539,6 +539,9 @@ graph.GetXaxis().SetRangeUser(gr_xMin, gr_xMax)
 graph.GetYaxis().SetRangeUser(gr_yMin, gr_yMax)
 graph.Draw("AL")
 
+leg = TLegend(0.7, 0.7, 0.85, 0.85)
+leg.SetHeader("MVA Method", "")
+leg.AddEntry(graph, method, "l")
 leg.Draw()
 
 hLine = TLine(gr_xMin, rej_selected, targetEff, rej_selected)
