@@ -54,18 +54,23 @@ backgroundTree_test = inputFile_bkg_test.Get('vars_bkg')
 nEventsSig_test = signalTree_test.GetEntries()
 nEventsBkg_test = backgroundTree_test.GetEntries()
 
-signalWeight = 1.0
-backgroundWeight = 1.0
+signalWeight_train = (
+    float(nEventsBkg_train) / float(nEventsSig_train)
+)
+backgroundWeight_train = 1.0
+
+signalWeight_test = 1.0
+backgroundWeight_test = 1.0
 
 #mycuts = TCut("!TMath::IsNaN(averageKurtosis_surface)")
 #mycutb = TCut("!TMath::IsNaN(coherentKurtosis_surface)")
 mycuts = TCut("")
 mycutb = TCut("")
 
-dataLoader.AddTree(signalTree_train, "Signal", signalWeight, mycuts, TMVA.Types.kTraining)
-dataLoader.AddTree(backgroundTree_train, "Background", backgroundWeight, mycutb, TMVA.Types.kTraining)
-dataLoader.AddTree(signalTree_test, "Signal", signalWeight, mycuts, TMVA.Types.kTesting)
-dataLoader.AddTree(backgroundTree_test, "Background", backgroundWeight, mycutb, TMVA.Types.kTesting)
+dataLoader.AddTree(signalTree_train, "Signal", signalWeight_train, mycuts, TMVA.Types.kTraining)
+dataLoader.AddTree(backgroundTree_train, "Background", backgroundWeight_train, mycutb, TMVA.Types.kTraining)
+dataLoader.AddTree(signalTree_test, "Signal", signalWeight_test, mycuts, TMVA.Types.kTesting)
+dataLoader.AddTree(backgroundTree_test, "Background", backgroundWeight_test, mycutb, TMVA.Types.kTesting)
 
 dataLoader.AddVariable( "passed_hit_filter"     , 'I')
 dataLoader.AddVariable( "nCoincidentPairs_PA"   , 'I')
@@ -134,8 +139,8 @@ dataLoader.AddSpectator( "reco_z" )
 ####################
 
 ### LD ###
-factory.BookMethod(dataLoader, TMVA.Types.kLD, "LD",
-                   'H:!V:VarTransform=None:CreateMVAPdfs:PDFInterpolMVAPdf=Spline2:NbinsMVAPdf=50:NsmoothMVAPdf=10')
+#factory.BookMethod(dataLoader, TMVA.Types.kLD, "LD",
+                   #'H:!V:VarTransform=None:CreateMVAPdfs:PDFInterpolMVAPdf=Spline2:NbinsMVAPdf=50:NsmoothMVAPdf=10')
 
 ### BDT ###
 factory.BookMethod(dataLoader, TMVA.Types.kBDT, "BDTD",
@@ -143,20 +148,20 @@ factory.BookMethod(dataLoader, TMVA.Types.kBDT, "BDTD",
 
 ### TMVA DNN ###
 # General layout
-layoutString = "Layout=TANH|128,TANH|128,TANH|128,LINEAR"
+#layoutString = "Layout=TANH|128,TANH|128,TANH|128,LINEAR"
 # Training strategies
-trainingString1 = "LearningRate=1e-2,Momentum=0.9,ConvergenceSteps=20,BatchSize=100,TestRepetitions=1,WeightDecay=1e-4,Regularization=None,DropConfig=0.0+0.5+0.5+0.5"
-trainingStrategyString = "TrainingStrategy="
-trainingStrategyString += trainingString1 # + "|" + trainingString2 + "|" + trainingString3 # for concatenating more training strings
+#trainingString1 = "LearningRate=1e-2,Momentum=0.9,ConvergenceSteps=20,BatchSize=100,TestRepetitions=1,WeightDecay=1e-4,Regularization=None,DropConfig=0.0+0.5+0.5+0.5"
+#trainingStrategyString = "TrainingStrategy="
+#trainingStrategyString += trainingString1 # + "|" + trainingString2 + "|" + trainingString3 # for concatenating more training strings
 # General Options
-dnnOptions = "!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM"
-dnnOptions += ":"
-dnnOptions += layoutString
-dnnOptions += ":"
-dnnOptions += trainingStrategyString
-dnnOptions += ":Architecture=CPU"
-dnnMethodName = "TMVA_DNN_CPU"
-factory.BookMethod(dataLoader, TMVA.Types.kDL, dnnMethodName, dnnOptions)
+#dnnOptions = "!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM"
+#dnnOptions += ":"
+#dnnOptions += layoutString
+#dnnOptions += ":"
+#dnnOptions += trainingStrategyString
+#dnnOptions += ":Architecture=CPU"
+#dnnMethodName = "TMVA_DNN_CPU"
+#factory.BookMethod(dataLoader, TMVA.Types.kDL, dnnMethodName, dnnOptions)
 
 ### Train Methods
 factory.TrainAllMethods()
