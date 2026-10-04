@@ -22,14 +22,12 @@ factory = TMVA.Factory('TMVA_Classification', outputFile,
 
 dataLoader = TMVA.DataLoader(f'dataLoader_vars_s{station_number}')
 
-#inputFileName_sig_train = f"train/vars_s{station_number}_sig_train.root"
-inputFileName_sig_train = f"train/vars_s23_sig_train.root"
+inputFileName_sig_train = f"train/vars_s{station_number}_sig_train.root"
 inputFile_sig_train = TFile.Open(dir_in+inputFileName_sig_train)
 if inputFile_sig_train is None:
     ROOT.Warning("TMVA_Classification", "Error opening input file %s (SIGNAL TRAINING) - exit", inputFileName_sig_train.Data())
 
-#inputFileName_sig_test = f"test/vars_s{station_number}_sig_test.root"
-inputFileName_sig_test = f"test/vars_s23_sig_test.root"
+inputFileName_sig_test = f"test/vars_s{station_number}_sig_test.root"
 inputFile_sig_test = TFile.Open(dir_in+inputFileName_sig_test)
 if inputFile_sig_test is None:
     ROOT.Warning("TMVA_Classification", "Error opening input file %s (SIGNAL TESTING) - exit", inputFileName_sig_test.Data())
@@ -73,10 +71,10 @@ dataLoader.AddTree(signalTree_test, "Signal", signalWeight_test, mycuts, TMVA.Ty
 dataLoader.AddTree(backgroundTree_test, "Background", backgroundWeight_test, mycutb, TMVA.Types.kTesting)
 
 dataLoader.AddVariable( "passed_hit_filter"     , 'I')
-dataLoader.AddVariable( "nCoincidentPairs_PA"   , 'I')
-dataLoader.AddVariable( "nHighHits_PA"          , 'I')
+#dataLoader.AddVariable( "nCoincidentPairs_PA"   , 'I')
+#dataLoader.AddVariable( "nHighHits_PA"          , 'I')
 dataLoader.AddVariable( "nCoincidentPairs_inIce", 'I')
-dataLoader.AddVariable( "nHighHits_inIce"       , 'I')
+#dataLoader.AddVariable( "nHighHits_inIce"       , 'I')
 
 dataLoader.AddVariable( "reco_max_corr"         , 'F')
 dataLoader.AddVariable( "reco_surf_corr_z"      , 'F')
@@ -85,13 +83,13 @@ dataLoader.AddVariable( "reco_surf_corr_zen"    , 'F')
 #dataLoader.AddVariable( "averageSNR_PA"         , 'F')
 #dataLoader.AddVariable( "averageKurtosis_PA"    , 'F')
 #dataLoader.AddVariable( "averageEntropy_PA"     , 'F')
-#dataLoader.AddVariable( "averageImpulsivity_PA" , 'F')
+dataLoader.AddVariable( "averageImpulsivity_PA" , 'F')
 #dataLoader.AddVariable( "coherentSNR_PA"        , 'F')
-#dataLoader.AddVariable( "coherentKurtosis_PA"   , 'F')
+dataLoader.AddVariable( "coherentKurtosis_PA"   , 'F')
 #dataLoader.AddVariable( "coherentEntropy_PA"    , 'F')
 #dataLoader.AddVariable( "coherentImpulsivity_PA", 'F')
 
-dataLoader.AddVariable( "averageSNR_inIce"         , 'F')
+#dataLoader.AddVariable( "averageSNR_inIce"         , 'F')
 dataLoader.AddVariable( "averageKurtosis_inIce"    , 'F')
 dataLoader.AddVariable( "averageEntropy_inIce"     , 'F')
 dataLoader.AddVariable( "averageImpulsivity_inIce" , 'F')
