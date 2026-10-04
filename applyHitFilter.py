@@ -132,7 +132,7 @@ def get_sim_vertex(station_id, event_object, det, is_FAERIE, vertex_direction=No
     r_rel_PA = np.sqrt(rho_rel_PA**2 + z_rel_PA**2)
     zenith_rel_PA, azimuth_rel_PA = get_zenith_azimuth(np.array([0,0,0]), interaction_vertex_rel_PA)
 
-    return (r_rel_PA, zenith_rel_PA, azimuth_rel_PA)
+    return (r_rel_PA, zenith_rel_PA, azimuth_rel_PA), (x_rel_PA, y_rel_PA, z_rel_PA, pa_pos_abs[2])
 
 
 def get_interaction_type(interaction_type):
@@ -198,7 +198,10 @@ if __name__ == "__main__":
         dir_out += "/"
 
     stationNumber = args.station_number
+
     runNumber = args.run
+    if runNumber is None:
+        parser.error("Run number is missing, please specify the run number!")
 
     json_select = args.json_select
     isExcluded = args.isExcluded
@@ -211,7 +214,7 @@ if __name__ == "__main__":
     isSim = args.isSim
     sim_E = args.sim_E
 
-    reco_config = "/home/hep/martinliu/research/reconstruction/reco_3D/reco.yaml"
+    reco_config = "/home/hep/martinliu/research/reconstruction/reco_3D/reco_projectLDA.yaml"
     with open(reco_config, "r") as f:
         config = yaml.safe_load(f)
     config["station_id"] = stationNumber
@@ -229,14 +232,18 @@ if __name__ == "__main__":
         treename = "events_sim"
         filename_out = f"filtered_sim_s{stationNumber}_{sim_E}_r{runNumber}.root"
         path_dir_in = Path(dir_in)
-        run_str = f"{runNumber:04d}"
-        fileList = sorted(path_dir_in.glob(f"*_j{run_str}*.nur"))
-        if not fileList:
-            fileList = sorted(path_dir_in.glob(f"*_c{run_str}*.nur"))
+        if "FAERIE" in dir_in:
+            isFAERIE = True
+            run_str = f"{runNumber:06d}"
+            fileList = sorted(path_dir_in.glob(f"SIM{run_str}.nur"))
+        else:
+            isFAERIE = False
+            run_str = f"{runNumber:04d}"
+            fileList = sorted(path_dir_in.glob(f"*_j{run_str}*.nur"))
+            if not fileList:
+                fileList = sorted(path_dir_in.glob(f"*_c{run_str}*.nur"))
     else:
-        if runNumber is None:
-            parser.error("Run number is missing, please specify one for the real data!")
-
+        isFAERIE = False
         # Skip runs with high trigger rates
         highTrigRuns = np.loadtxt(f"/mnt/nrdstor/hep/martinliu/data/realData/triggerRates/highTrigRuns_s{stationNumber}.txt", dtype=int)
         if runNumber in highTrigRuns:
@@ -344,6 +351,37 @@ if __name__ == "__main__":
     tree_out.SetDirectory(file_out)
     tree_out.SetMaxTreeSize(1000000000000)
 
+    if isFAERIE:
+        FAERIE_treename = treename + "_FAERIE"
+        FAERIE_tree_out = ROOT.TTree(FAERIE_treename, FAERIE_treename)
+        FAERIE_dir_out = f"/mnt/nrdstor/hep/martinliu/data/simData/CR/project_LDA/FAERIE/station{stationNumber}/"
+        FAERIE_filename_out = f"FAERIE_sim_s{stationNumber}_{sim_E}_r{runNumber}.root"
+        FAERIE_file_out = TFile(FAERIE_dir_out+FAERIE_filename_out, "RECREATE")
+        true_x_rel_PA = array('f', [np.nan])
+        true_y_rel_PA = array('f', [np.nan])
+        true_z_rel_PA = array('f', [np.nan])
+        station_z_abs_PA = array('f', [np.nan])
+        is_triggered = array('i', [0])
+        FAERIE_tree_out.Branch("station_number", station_number, 'station_number/I')
+        FAERIE_tree_out.Branch("run_number", run_number, 'run_number/I')
+        FAERIE_tree_out.Branch("event_number", event_number, 'event_number/I')
+        FAERIE_tree_out.Branch("sim_energy", sim_energy, 'sim_energy/F')
+        FAERIE_tree_out.Branch("shower_energy", shower_energy, 'shower_energy/F')
+        FAERIE_tree_out.Branch("inelasticity", inelasticity, 'inelasticity/F')
+        FAERIE_tree_out.Branch("interaction_type", interaction_type, 'interaction_type/I')
+        FAERIE_tree_out.Branch("trigger_time", trigger_time, 'trigger_time/D')
+        FAERIE_tree_out.Branch("true_radius", true_radius, 'true_radius/F')
+        FAERIE_tree_out.Branch("true_theta", true_theta, 'true_theta/F')
+        FAERIE_tree_out.Branch("true_phi", true_phi, 'true_phi/F')
+        FAERIE_tree_out.Branch("true_source_theta", true_source_theta, 'true_source_theta/I')
+        FAERIE_tree_out.Branch("true_source_phi", true_source_phi, 'true_source_phi/I')
+        FAERIE_tree_out.Branch("true_x_rel_PA", true_x_rel_PA, 'true_x_rel_PA/F')
+        FAERIE_tree_out.Branch("true_y_rel_PA", true_y_rel_PA, 'true_y_rel_PA/F')
+        FAERIE_tree_out.Branch("true_z_rel_PA", true_z_rel_PA, 'true_z_rel_PA/F')
+        FAERIE_tree_out.Branch("station_z_abs_PA", station_z_abs_PA, 'station_z_abs_PA/F')
+        FAERIE_tree_out.Branch("is_triggered", is_triggered, 'is_triggered/I')
+        FAERIE_tree_out.SetDirectory(FAERIE_file_out)
+
     det = detector.Detector(source="rnog_mongo")
     det.update(datetime.datetime(2022, 10, 1))
 
@@ -374,7 +412,6 @@ if __name__ == "__main__":
     reco = NuRadioReco.modules.interferometricDirectionReconstruction3D.InterferometricReco3D()
     reco.begin(station_id=stationNumber, config=config, det=det)
 
-    runNumber_sim = 0
     nEvents_total = 0
     nEvents_FT = 0
     nEvents_RADIANT = 0
@@ -385,23 +422,12 @@ if __name__ == "__main__":
     nEvents_LT = 0
     nEvents_passedHF = 0
     for file in fileList:
-        isFAERIE = False
-        isNew = False
         if isSim:
             filename = str(file).split("/")[-1]
-            if "cos" in filename and "phi" in filename:
-                pattern = r"cos_(-?\d+(?:\.\d+)?)-phi_(-?\d+(?:\.\d+)?)"
-                m = re.search(pattern, filename)
-                cosine, phi = map(float, m.groups())
-                source_theta = np.rad2deg(np.arccos(cosine))
-                source_phi = phi
-                direction = (source_theta, source_phi)
-            elif "SIM" in filename:
-                isFAERIE = True
+            if isFAERIE:
                 direction = None
-                runNumber_sim = int(filename.split(".nur")[0].split("_")[-1])
+                runNumber_sim = int(filename.split(".nur")[0].split("SIM")[-1])
             else:
-                isNew = True
                 file_csv = get_csv_from_nur(filename)
                 #file_hdf5 = get_hdf5_from_nur(filename)
                 ledger = pd.read_csv(dir_in + file_csv)
@@ -425,13 +451,18 @@ if __name__ == "__main__":
             isBadSimEvent = False
 
             if isSim:
-                if not station.has_triggered():
-                    continue
                 run_number[0] = runNumber_sim
                 event_number[0] = eventID_sim
-                sim_energy[0] = sim_E_number
                 trigger_time[0] = -1.0
-                if isNew:
+                if isFAERIE:
+                    sim_energy[0] = float(list(event.get_sim_showers())[0].get_parameter(showerParameters.energy))
+                    shower_energy[0] = -1.0
+                    inelasticity[0] = -1.0
+                    interaction_type[0] = -1
+                    eventID_sim += 1
+                else:
+                    if not station.has_triggered():
+                        continue
                     event_group_id = event.get_run_number()
                     row = ledger.loc[ledger["event_group_id"] == event_group_id].iloc[0]
                     source_theta = row["zenith_deg"]
@@ -442,13 +473,9 @@ if __name__ == "__main__":
                     inelasticity[0] = row["inelasticity"]
                     interaction_type[0] = get_interaction_type(row["interaction_type"])
                     eventID_sim = get_next_event_id(runNumber_sim)
-                else:
-                    shower_energy[0] = -1.0
-                    inelasticity[0] = -1.0
-                    interaction_type[0] = -1
-                    eventID_sim += 1
 
-                radius, theta, phi = get_sim_vertex(station_id, event, det, isFAERIE, direction)
+                (radius, theta, phi), (x_rel_PA, y_rel_PA, z_rel_PA, z_abs_PA) = get_sim_vertex(station_id, event, det, isFAERIE, direction)
+                print((x_rel_PA, y_rel_PA, z_rel_PA, z_abs_PA))
                 true_radius[0] = radius
                 true_theta[0] = theta
                 true_phi[0] = phi
@@ -512,11 +539,21 @@ if __name__ == "__main__":
                 true_source_theta[0] = -1
                 true_source_phi[0] = -1
 
+            if isFAERIE:
+                is_triggered[0] = int(station.has_triggered())
+                true_x_rel_PA[0] = float(x_rel_PA)
+                true_y_rel_PA[0] = float(y_rel_PA)
+                true_z_rel_PA[0] = float(z_rel_PA)
+                station_z_abs_PA[0] = float(z_abs_PA)
+                FAERIE_tree_out.Fill()
+                if not station.has_triggered():
+                    continue
+
             channelBlockOffsets.run(event, station, det)
 
             channelCableDelayAdder.run(event, station, det, mode='subtract')
 
-            channelResampler.run(event, station, det, sampling_rate=10 * units.GHz)
+            channelResampler.run(event, station, det, sampling_rate=5 * units.GHz)
 
             channelSinewaveSubtraction.run(event, station, det, algorithm="sliding", peak_prominence=4.0)
 
@@ -579,12 +616,7 @@ if __name__ == "__main__":
                 for i_channel in sorted_channels:
                     i_channel = int(i_channel)
                     if isSim:
-                        if isFAERIE or isNew:
-                            graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
-                        else:
-                            # Roll waveform to place the pulse near the center
-                            #traces[i_channel] = np.roll(traces[i_channel], 800)
-                            graphTitle = f"({sim_energy[0]},{cosine},{int(phi)}): Evt{event_number[0]}, Ch{i_channel}"
+                        graphTitle = f"{sim_energy[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                     else:
                         graphTitle = f"S{station_number[0]}, R{run_number[0]}, Evt{event_number[0]}, Ch{i_channel}"
                     graph_vector[i_channel] = TGraph(len(times[i_channel]), times[i_channel], traces[i_channel])
@@ -603,8 +635,6 @@ if __name__ == "__main__":
                 tree_out.Fill()
 
         reader.end()
-        if isSim and not isFAERIE and not isNew:
-            runNumber_sim += 1
 
     reco.end()
 
@@ -613,6 +643,10 @@ if __name__ == "__main__":
     file_out.Close()
 
     if isSim:
+        if isFAERIE:
+            FAERIE_file_out.cd()
+            FAERIE_tree_out.Write()
+            FAERIE_file_out.Close()
         print(f"Station {stationNumber}  Energy {sim_E}")
         if nEvents_badSim:
             print(f"Number of BAD sim events: {nEvents_badSim}")
