@@ -1,4 +1,5 @@
 import argparse
+import math
 import numpy as np
 import json
 import os
@@ -167,6 +168,54 @@ def exponential_predictions_for_bins(
     )
     total_uncertainty = np.sqrt(max(total_variance, 0.0))
     return predictions, total_prediction, total_uncertainty
+
+
+def gaussian_interval_prediction(
+    interval_low,
+    interval_high,
+    amplitude,
+    mean,
+    sigma,
+    covariance,
+    bin_width,
+):
+    """Return a Gaussian yield and covariance-propagated uncertainty."""
+    if interval_high <= interval_low or sigma <= 0.0:
+        return 0.0, 0.0
+
+    sqrt_two = np.sqrt(2.0)
+    z_low = (interval_low - mean) / (sqrt_two * sigma)
+    z_high = (interval_high - mean) / (sqrt_two * sigma)
+
+    # erfc avoids cancellation when both integration limits are far into the
+    # same Gaussian tail, as is often the case above the selected BDT cut.
+    if z_low > 0.0:
+        erf_difference = math.erfc(z_low) - math.erfc(z_high)
+    elif z_high < 0.0:
+        erf_difference = (
+            math.erfc(-z_high) - math.erfc(-z_low)
+        )
+    else:
+        erf_difference = math.erf(z_high) - math.erf(z_low)
+
+    normalization = sigma * np.sqrt(np.pi / 2.0) * erf_difference
+    integral = amplitude * normalization
+
+    exp_low = np.exp(-0.5 * ((interval_low - mean) / sigma)**2)
+    exp_high = np.exp(-0.5 * ((interval_high - mean) / sigma)**2)
+    gradient = np.array([
+        normalization,
+        amplitude * (exp_low - exp_high),
+        integral / sigma - amplitude * (
+            ((interval_high - mean) / sigma) * exp_high
+            - ((interval_low - mean) / sigma) * exp_low
+        ),
+    ]) / bin_width
+
+    predicted_yield = integral / bin_width
+    variance = float(gradient @ covariance @ gradient)
+    uncertainty = np.sqrt(max(variance, 0.0))
+    return predicted_yield, uncertainty
 
 
 def collect_outlier_events(
@@ -777,6 +826,7 @@ if __name__ == "__main__":
         gaussian_fit = None
         gaussian_fit_status = None
         gaussian_fit_succeeded = False
+        gaussian_fit_covariance = None
         positive_excess_bins = [
             bin_index
             for bin_index in sorted(full_outlier_bins)
@@ -833,6 +883,21 @@ if __name__ == "__main__":
             gaussian_fit_status = int(fit_result)
             gaussian_fit_succeeded = gaussian_fit_status == 0
             if gaussian_fit_succeeded:
+                try:
+                    gaussian_fit_covariance = np.array([
+                        [
+                            float(fit_result.CovMatrix(i, j))
+                            for j in range(3)
+                        ]
+                        for i in range(3)
+                    ])
+                except (AttributeError, TypeError):
+                    # Older PyROOT bindings may not expose CovMatrix through
+                    # TFitResultPtr. Retain parameter variances in that case.
+                    gaussian_fit_covariance = np.diag([
+                        gaussian_fit.GetParError(i)**2
+                        for i in range(3)
+                    ])
                 gaussian_fit.SetLineColor(ROOT.kBlue)
                 gaussian_fit.SetLineWidth(3)
                 gaussian_fit.Draw("same")
@@ -991,6 +1056,55 @@ if __name__ == "__main__":
             print(
                 "Using fixed scaled-exponential and Gaussian parameters; "
                 "no combined refit was performed."
+            )
+
+            gaussian_parameters = np.array([
+                gaussian_fit.GetParameter(parameter_index)
+                for parameter_index in range(3)
+            ])
+            (
+                n_predicted_gaussian_full,
+                n_predicted_gaussian_full_error,
+            ) = gaussian_interval_prediction(
+                cut,
+                xMax,
+                gaussian_parameters[0],
+                gaussian_parameters[1],
+                gaussian_parameters[2],
+                gaussian_fit_covariance,
+                bin_width,
+            )
+            n_predicted_combined_full = (
+                n_predicted_full + n_predicted_gaussian_full
+            )
+            # The burn-sample exponential fit and the full-data Gaussian fit
+            # are treated as independent for this approximate propagation.
+            n_predicted_combined_full_error = np.sqrt(
+                n_predicted_full_error**2
+                + n_predicted_gaussian_full_error**2
+            )
+
+            print("\nFull-data combined-model estimate:")
+            print(f"Observed events above cut: {n_observed_full:.0f}")
+            print(
+                f"Exponential component above cut: "
+                f"{n_predicted_full:.3f} +/- "
+                f"{n_predicted_full_error:.3f}"
+            )
+            print(
+                f"Gaussian component above cut: "
+                f"{n_predicted_gaussian_full:.3f} +/- "
+                f"{n_predicted_gaussian_full_error:.3f}"
+            )
+            print(
+                f"Combined predicted events above cut: "
+                f"{n_predicted_combined_full:.3f} +/- "
+                f"{n_predicted_combined_full_error:.3f}"
+            )
+            print(
+                "The Gaussian component is fitted to the full-data excess; "
+                "this combined value is a data-calibrated estimate, not an "
+                "independent full-data prediction."
             )
 
         combined_uncertainty.Draw("3 same")
