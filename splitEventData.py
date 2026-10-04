@@ -128,7 +128,7 @@ if __name__ == "__main__":
         quit()
 
     isSim = False
-    if "sim" in filename_in:
+    if "sim" in filename_in or "sig" in filename_in:
         isSim = True
         if type == "F":
             treename = "events_sim"
