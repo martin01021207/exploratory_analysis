@@ -620,7 +620,7 @@ output.cd()
 
 nbin = 100
 if method == "BDTD":
-    xMin = -0.4
+    xMin = -0.45
     xMax = 1.0
 else:
     xMin = -0.1
