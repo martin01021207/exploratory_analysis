@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from array import array
 import ROOT
-from ROOT import TFile, TTree, TCanvas, TH1F, TLegend, TLine, TF1, TVirtualFitter, TGraphErrors
+from ROOT import TFile, TTree, TCanvas, TH1F, TLegend, TLine, TF1, TGraphErrors
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.integrate import quad
@@ -218,6 +218,392 @@ def gaussian_interval_prediction(
     return predicted_yield, uncertainty
 
 
+def fit_covariance_matrix(fit_result, fit_function, n_parameters):
+    """Extract a fit covariance matrix with a diagonal-only fallback."""
+    try:
+        return np.array([
+            [
+                float(fit_result.CovMatrix(i, j))
+                for j in range(n_parameters)
+            ]
+            for i in range(n_parameters)
+        ])
+    except (AttributeError, TypeError):
+        return np.diag([
+            fit_function.GetParError(i)**2
+            for i in range(n_parameters)
+        ])
+
+
+def poisson_deviance(hist, fit_function, first_bin, last_bin):
+    """Calculate Poisson deviance for a fitted histogram interval."""
+    deviance = 0.0
+    for bin_index in range(first_bin, last_bin + 1):
+        observed = max(0.0, float(hist.GetBinContent(bin_index)))
+        bin_center = hist.GetXaxis().GetBinCenter(bin_index)
+        expected = max(1.0e-12, float(fit_function.Eval(bin_center)))
+        if observed > 0.0:
+            deviance += 2.0 * (
+                expected - observed
+                + observed * np.log(observed / expected)
+            )
+        else:
+            deviance += 2.0 * expected
+    return deviance
+
+
+def scan_exponential_fit_start(
+    hist,
+    fit_high,
+    prediction_low,
+    prediction_high,
+    min_bins,
+    min_events,
+    consecutive_fits,
+    stability_sigma,
+    max_reduced_deviance,
+):
+    """Select the earliest stable exponential-fit starting bin."""
+    peak_bin = hist.GetMaximumBin()
+    last_fit_bin = hist.FindFixBin(np.nextafter(fit_high, -np.inf))
+    last_fit_bin = min(last_fit_bin, hist.GetNbinsX())
+    last_start_bin = last_fit_bin - min_bins + 1
+    bin_width = hist.GetBinWidth(peak_bin)
+    scan_results = []
+
+    for first_bin in range(peak_bin + 1, last_start_bin + 1):
+        n_fit_bins = last_fit_bin - first_bin + 1
+        n_fit_events = float(hist.Integral(first_bin, last_fit_bin))
+        if n_fit_bins < min_bins or n_fit_events < min_events:
+            continue
+
+        fit_low = hist.GetXaxis().GetBinCenter(first_bin)
+        formula = f"[0]*exp(-[1]*(x-{fit_low}))"
+        candidate_fit = TF1(
+            f"fit_start_candidate_{first_bin}",
+            formula,
+            fit_low,
+            fit_high,
+        )
+
+        amplitude_seed = max(float(hist.GetBinContent(first_bin)), 1.0)
+        final_positive_bin = None
+        for bin_index in range(last_fit_bin, first_bin, -1):
+            if hist.GetBinContent(bin_index) > 0.0:
+                final_positive_bin = bin_index
+                break
+        slope_seed = 10.0
+        if final_positive_bin is not None:
+            final_content = max(
+                float(hist.GetBinContent(final_positive_bin)), 1.0
+            )
+            final_center = hist.GetXaxis().GetBinCenter(
+                final_positive_bin
+            )
+            if final_center > fit_low and amplitude_seed > final_content:
+                slope_seed = np.log(
+                    amplitude_seed / final_content
+                ) / (final_center - fit_low)
+        slope_seed = min(max(slope_seed, 1.0e-3), 1.0e3)
+
+        candidate_fit.SetParameters(amplitude_seed, slope_seed)
+        candidate_fit.SetParLimits(
+            0,
+            1.0e-12,
+            max(1.0e6, 100.0 * hist.GetMaximum()),
+        )
+        candidate_fit.SetParLimits(1, 1.0e-6, 1.0e3)
+        fit_result = hist.Fit(candidate_fit, "RQLS0N")
+        fit_status = int(fit_result)
+        if fit_status != 0:
+            continue
+
+        parameters = np.array([
+            candidate_fit.GetParameter(i) for i in range(2)
+        ])
+        covariance = fit_covariance_matrix(
+            fit_result, candidate_fit, 2
+        )
+        parameter_errors = np.sqrt(
+            np.maximum(np.diag(covariance), 0.0)
+        )
+        if not (
+            np.all(np.isfinite(parameters))
+            and np.all(np.isfinite(parameter_errors))
+            and parameters[0] > 0.0
+            and parameters[1] > 0.0
+        ):
+            continue
+
+        tail_prediction, _, tail_uncertainty = (
+            exponential_bin_prediction(
+                prediction_low,
+                prediction_high,
+                parameters[0],
+                parameters[1],
+                covariance,
+                fit_low,
+                bin_width,
+                1.0,
+            )
+        )
+        deviance = poisson_deviance(
+            hist, candidate_fit, first_bin, last_fit_bin
+        )
+        ndf = max(n_fit_bins - 2, 1)
+        reduced_deviance = deviance / ndf
+
+        scan_results.append({
+            "bin": first_bin,
+            "x": fit_low,
+            "events": n_fit_events,
+            "fit_bins": n_fit_bins,
+            "amplitude": parameters[0],
+            "amplitude_error": parameter_errors[0],
+            "slope": parameters[1],
+            "slope_error": parameter_errors[1],
+            "tail": tail_prediction,
+            "tail_error": tail_uncertainty,
+            "deviance": deviance,
+            "ndf": ndf,
+            "reduced_deviance": reduced_deviance,
+            "acceptable": reduced_deviance <= max_reduced_deviance,
+        })
+
+    if not scan_results:
+        raise RuntimeError(
+            "No exponential fit-start candidates passed the minimum-bin, "
+            "minimum-event, and fit-status requirements."
+        )
+
+    def statistically_stable(left, right, value_key, error_key):
+        combined_error = np.hypot(
+            left[error_key], right[error_key]
+        )
+        difference = abs(left[value_key] - right[value_key])
+        if combined_error <= 0.0:
+            return difference <= 1.0e-12
+        return difference <= stability_sigma * combined_error
+
+    selected = None
+    selected_plateau = []
+    selection_reason = None
+    for start_index in range(
+        len(scan_results) - consecutive_fits + 1
+    ):
+        window = scan_results[
+            start_index:start_index + consecutive_fits
+        ]
+        if any(not result["acceptable"] for result in window):
+            continue
+        if any(
+            window[offset]["bin"] != window[0]["bin"] + offset
+            for offset in range(consecutive_fits)
+        ):
+            continue
+
+        stable_window = all(
+            statistically_stable(left, right, "slope", "slope_error")
+            and statistically_stable(
+                left, right, "tail", "tail_error"
+            )
+            for left, right in zip(window[:-1], window[1:])
+        )
+        if stable_window:
+            selected = window[0]
+            selected_plateau = window
+            selection_reason = (
+                f"earliest {consecutive_fits}-bin stable plateau"
+            )
+            break
+
+    if selected is None:
+        acceptable_results = [
+            result for result in scan_results if result["acceptable"]
+        ]
+        fallback_pool = acceptable_results or scan_results
+        selected = min(
+            fallback_pool,
+            key=lambda result: (
+                result["reduced_deviance"], result["bin"]
+            ),
+        )
+        selected_plateau = acceptable_results or [selected]
+        selection_reason = (
+            "fallback to the candidate with the lowest reduced Poisson "
+            "deviance because no stable plateau was found"
+        )
+
+    selected_plateau_bins = {
+        result["bin"] for result in selected_plateau
+    }
+    for result in scan_results:
+        result["in_uncertainty_set"] = (
+            result["bin"] in selected_plateau_bins
+        )
+
+    return scan_results, selected, selection_reason
+
+
+def save_fit_start_scan_plot(
+    output_path,
+    hist,
+    fit_high,
+    scan_results,
+    selected,
+    selection_reason,
+    target_cut,
+    max_reduced_deviance,
+    station_number,
+):
+    """Save the fit-start stability diagnostics as a one-page PDF."""
+    x_values = np.array([result["x"] for result in scan_results])
+    slopes = np.array([result["slope"] for result in scan_results])
+    slope_errors = np.array([
+        result["slope_error"] for result in scan_results
+    ])
+    tails = np.array([result["tail"] for result in scan_results])
+    tail_errors = np.array([
+        result["tail_error"] for result in scan_results
+    ])
+    reduced_deviances = np.array([
+        result["reduced_deviance"] for result in scan_results
+    ])
+    acceptable = np.array([
+        result["acceptable"] for result in scan_results
+    ])
+    uncertainty_set = np.array([
+        result["in_uncertainty_set"] for result in scan_results
+    ])
+
+    figure, axes_grid = plt.subplots(2, 2, figsize=(11, 8.5))
+    axes = axes_grid.ravel()
+    figure.suptitle(
+        f"Exponential fit-start stability scan (S{station_number})",
+        fontsize=15,
+    )
+
+    axes[0].errorbar(
+        x_values,
+        slopes,
+        yerr=slope_errors,
+        fmt="o",
+        markersize=4,
+        color="0.55",
+        ecolor="0.75",
+        capsize=2,
+        label="Successful candidate fits",
+    )
+    axes[0].scatter(
+        x_values[acceptable],
+        slopes[acceptable],
+        s=28,
+        color="tab:blue",
+        label="Acceptable Poisson deviance",
+        zorder=3,
+    )
+    axes[0].scatter(
+        x_values[uncertainty_set],
+        slopes[uncertainty_set],
+        s=55,
+        facecolors="none",
+        edgecolors="tab:red",
+        linewidths=1.5,
+        label="Fit-range uncertainty set",
+        zorder=4,
+    )
+    axes[0].set_ylabel("Exponential slope B")
+    axes[0].legend(fontsize=9)
+
+    axes[1].errorbar(
+        x_values,
+        tails,
+        yerr=tail_errors,
+        fmt="o",
+        markersize=4,
+        color="tab:purple",
+        ecolor="plum",
+        capsize=2,
+    )
+    axes[1].scatter(
+        x_values[uncertainty_set],
+        tails[uncertainty_set],
+        s=55,
+        facecolors="none",
+        edgecolors="tab:red",
+        linewidths=1.5,
+        zorder=4,
+    )
+    axes[1].set_ylabel(
+        f"Predicted events\nabove BDT = {target_cut:.3f}"
+    )
+
+    axes[2].plot(
+        x_values,
+        reduced_deviances,
+        "o-",
+        markersize=4,
+        color="tab:green",
+    )
+    axes[2].axhline(
+        max_reduced_deviance,
+        color="black",
+        linestyle="--",
+        linewidth=1.3,
+        label=(
+            f"Acceptance limit = {max_reduced_deviance:.2f}"
+        ),
+    )
+    axes[2].set_ylabel("Poisson deviance / ndf")
+    axes[2].set_xlabel("Candidate fit starting score")
+    axes[2].legend(fontsize=9)
+
+    for axis in axes[:3]:
+        axis.axvline(
+            selected["x"],
+            color="tab:red",
+            linestyle="--",
+            linewidth=1.8,
+        )
+        axis.grid(True, alpha=0.25)
+
+    last_fit_bin = hist.FindFixBin(np.nextafter(fit_high, -np.inf))
+    last_fit_bin = min(last_fit_bin, hist.GetNbinsX())
+    residual_x = []
+    residual_pulls = []
+    for bin_index in range(selected["bin"], last_fit_bin + 1):
+        bin_center = hist.GetXaxis().GetBinCenter(bin_index)
+        observed = float(hist.GetBinContent(bin_index))
+        expected = selected["amplitude"] * np.exp(
+            -selected["slope"] * (bin_center - selected["x"])
+        )
+        expected = max(expected, 1.0e-12)
+        residual_x.append(bin_center)
+        residual_pulls.append((observed - expected) / np.sqrt(expected))
+
+    axes[3].axhspan(-2.0, 2.0, color="0.92", zorder=0)
+    axes[3].axhline(0.0, color="black", linewidth=1.0)
+    axes[3].plot(
+        residual_x,
+        residual_pulls,
+        "o-",
+        markersize=4,
+        color="tab:orange",
+    )
+    axes[3].set_xlabel("BDT score in selected fit range")
+    axes[3].set_ylabel("Poisson pull")
+    axes[3].set_title("Selected-fit residuals")
+    axes[3].grid(True, alpha=0.25)
+
+    axes[0].set_title(
+        f"Selected x_min = {selected['x']:.4f}: {selection_reason}",
+        fontsize=10,
+    )
+    figure.tight_layout(rect=(0.0, 0.0, 1.0, 0.95))
+    figure.savefig(output_path, bbox_inches="tight")
+    plt.close(figure)
+
+
 def collect_outlier_events(
     tree, hist, outlier_bins, score_branch, minimum_score
 ):
@@ -297,6 +683,48 @@ if __name__ == "__main__":
             "than this value (default: 0.06)"
         ),
     )
+    parser.add_argument(
+        '--fit_start_consecutive',
+        type=int,
+        default=4,
+        help=(
+            "Number of consecutive stable starting bins required for the "
+            "automatic exponential fit-start selection (default: 4)"
+        ),
+    )
+    parser.add_argument(
+        '--fit_start_stability_sigma',
+        type=float,
+        default=1.0,
+        help=(
+            "Maximum adjacent-fit change in combined standard deviations "
+            "for the slope and tail prediction (default: 1.0)"
+        ),
+    )
+    parser.add_argument(
+        '--fit_start_max_reduced_deviance',
+        type=float,
+        default=2.0,
+        help=(
+            "Maximum Poisson deviance/ndf for an acceptable candidate fit "
+            "(default: 2.0)"
+        ),
+    )
+    parser.add_argument(
+        '--fit_start_min_bins',
+        type=int,
+        default=8,
+        help="Minimum number of bins in each candidate fit (default: 8)",
+    )
+    parser.add_argument(
+        '--fit_start_min_events',
+        type=float,
+        default=50.0,
+        help=(
+            "Minimum burn-sample events in each candidate fit range "
+            "(default: 50)"
+        ),
+    )
     args = parser.parse_args()
 
     stationNumber = args.stationNumber
@@ -308,6 +736,26 @@ if __name__ == "__main__":
     cut = args.target_cut
     full_data_file = args.full_data_file
     outlier_min_score = args.outlier_min_score
+    fit_start_consecutive = args.fit_start_consecutive
+    fit_start_stability_sigma = args.fit_start_stability_sigma
+    fit_start_max_reduced_deviance = (
+        args.fit_start_max_reduced_deviance
+    )
+    fit_start_min_bins = args.fit_start_min_bins
+    fit_start_min_events = args.fit_start_min_events
+
+    if fit_start_consecutive < 2:
+        raise ValueError("--fit_start_consecutive must be at least 2")
+    if fit_start_stability_sigma <= 0.0:
+        raise ValueError("--fit_start_stability_sigma must be positive")
+    if fit_start_max_reduced_deviance <= 0.0:
+        raise ValueError(
+            "--fit_start_max_reduced_deviance must be positive"
+        )
+    if fit_start_min_bins < 3:
+        raise ValueError("--fit_start_min_bins must be at least 3")
+    if fit_start_min_events <= 0.0:
+        raise ValueError("--fit_start_min_events must be positive")
 
     method = "BDTD"
 
@@ -318,6 +766,7 @@ if __name__ == "__main__":
     filename_in = path_to_file_in.split(".root")[0].split("testTree_")[1]
     graphFilename_expMC = f"expMC_{filename_in}.pdf"
     graphFilename = f"fittedTestedResults_{filename_in}.pdf"
+    graphFilename_fit_start = f"fitStartScan_{filename_in}.pdf"
 
     input = TFile.Open(path_to_file_in)
     tree_S = input.Get("TestTree_S")
@@ -342,7 +791,7 @@ if __name__ == "__main__":
     ROOT.gPad.SetLogy(1)
 
     nbin = 100
-    xMin = -0.4
+    xMin = -0.45
     xMax = 1.0
 
     if not xMin <= outlier_min_score < xMax:
@@ -395,34 +844,124 @@ if __name__ == "__main__":
     cutLine.SetLineWidth(2)
     cutLine.Draw("same")
 
-    d_bin = 11
-    bin1 = hist_B.GetMaximumBin() + d_bin
     x2 = 0.35
+    (
+        fit_start_scan_results,
+        selected_fit_start,
+        fit_start_selection_reason,
+    ) = scan_exponential_fit_start(
+        hist_B,
+        x2,
+        cut,
+        xMax,
+        fit_start_min_bins,
+        fit_start_min_events,
+        fit_start_consecutive,
+        fit_start_stability_sigma,
+        fit_start_max_reduced_deviance,
+    )
+    bin1 = selected_fit_start["bin"]
     x1 = hist_B.GetXaxis().GetBinCenter(bin1)
     bin_width = hist_B.GetBinWidth(hist_B.FindFixBin(x1))
+
+    fit_start_scan_path = os.path.join(
+        dir_out, graphFilename_fit_start
+    )
+    save_fit_start_scan_plot(
+        fit_start_scan_path,
+        hist_B,
+        x2,
+        fit_start_scan_results,
+        selected_fit_start,
+        fit_start_selection_reason,
+        cut,
+        fit_start_max_reduced_deviance,
+        stationNumber,
+    )
+
+    print("\nAutomatic exponential fit-start scan:")
+    print(f"Successful candidates: {len(fit_start_scan_results)}")
+    print(
+        f"Requirements: at least {fit_start_min_bins} bins, "
+        f"{fit_start_min_events:g} events, "
+        f"deviance/ndf <= {fit_start_max_reduced_deviance:g}, and "
+        f"{fit_start_consecutive} consecutive fits stable within "
+        f"{fit_start_stability_sigma:g} sigma"
+    )
+    print(
+        f"Selected starting bin: {bin1} "
+        f"(x_min = {x1:.6f})"
+    )
+    print(f"Selection reason: {fit_start_selection_reason}")
+    if fit_start_selection_reason.startswith("fallback"):
+        print(
+            "WARNING: no stable fit-start plateau satisfied all default "
+            "criteria. Inspect the diagnostic PDF before using this fit."
+        )
+    print(
+        f"Selected candidate deviance/ndf: "
+        f"{selected_fit_start['reduced_deviance']:.3f}"
+    )
+    print(f"Saved fit-start diagnostics: {fit_start_scan_path}")
+
     formula = f"[0]*exp(-[1]*(x-{x1}))"
     fitLine = TF1("fitLine", formula, x1, x2)
-    fitLine.SetParameters(0, 1000)
-    fitLine.SetParameters(1, 0.5)
-    fit = hist_B.Fit(fitLine, "RQ")
+    fitLine.SetParameters(
+        selected_fit_start["amplitude"],
+        selected_fit_start["slope"],
+    )
+    fitLine.SetParLimits(
+        0,
+        1.0e-12,
+        max(1.0e6, 100.0 * hist_B.GetMaximum()),
+    )
+    fitLine.SetParLimits(1, 1.0e-6, 1.0e3)
+    fit = hist_B.Fit(fitLine, "RQLS")
+    fit_status = int(fit)
+    if fit_status != 0:
+        raise RuntimeError(
+            f"Final exponential fit failed with ROOT status {fit_status}"
+        )
     fitLine.SetLineStyle(9)
     fitLine.SetLineWidth(3)
     fitLine.SetLineColor(4)
 
-    fitter = TVirtualFitter.GetFitter()
-    covMatrix = fitter.GetCovarianceMatrix()
-    pars = fitLine.GetParameters()
-    popt = np.array([])
-    pcov = [np.array([]) for i in range(2)]
-    for i in range(2):
-        popt = np.append(popt, pars[i])
-        for j in range(2):
-            pcov[i] = np.append(pcov[i], fitter.GetCovarianceMatrixElement(i,j))
-    pcov = np.array(pcov)
-    nEvents_tail = fitLine.Integral(cut, 1) / bin_width
-    tail_error = fitLine.IntegralError(cut, 1, pars, pcov) / bin_width
+    popt = np.array([
+        fitLine.GetParameter(parameter_index)
+        for parameter_index in range(2)
+    ])
+    pcov = fit_covariance_matrix(fit, fitLine, 2)
+    nEvents_tail, _, tail_error = exponential_bin_prediction(
+        cut,
+        xMax,
+        popt[0],
+        popt[1],
+        pcov,
+        x1,
+        bin_width,
+        1.0,
+    )
+    selected_plateau_tails = [
+        result["tail"]
+        for result in fit_start_scan_results
+        if result["in_uncertainty_set"]
+    ]
+    fit_start_tail_systematic = max(
+        (
+            abs(candidate_tail - nEvents_tail)
+            for candidate_tail in selected_plateau_tails
+        ),
+        default=0.0,
+    )
     print(f"Number of Events in Tail: {nEvents_tail} +/- {tail_error}")
-    print(f"Initial Fit: A = {popt[0]:.2f}, B = {popt[1]:.2f}, x_min = {x1}")
+    print(
+        f"Fit-start range systematic: +/- "
+        f"{fit_start_tail_systematic:.3f}"
+    )
+    print(
+        f"Initial Fit: A = {popt[0]:.2f}, B = {popt[1]:.2f}, "
+        f"x_min = {x1}"
+    )
     print("Covariance matrix:")
     print(pcov)
 
@@ -748,13 +1287,27 @@ if __name__ == "__main__":
         )
 
         n_predicted_full_error = scale_factor * tail_error
+        n_predicted_full_fit_start_systematic = (
+            scale_factor * fit_start_tail_systematic
+        )
+        n_predicted_full_total_error = np.hypot(
+            n_predicted_full_error,
+            n_predicted_full_fit_start_systematic,
+        )
 
         print("\nFull-data validation:")
         print(f"Scale factor: {scale_factor:.0f}")
         print(f"Observed events above cut: {n_observed_full:.0f}")
         print(
             f"Predicted events above cut: "
-            f"{n_predicted_full:.3f} +/- {n_predicted_full_error:.3f}"
+            f"{n_predicted_full:.3f} +/- "
+            f"{n_predicted_full_error:.3f} (fit statistical) +/- "
+            f"{n_predicted_full_fit_start_systematic:.3f} "
+            f"(fit-start range)"
+        )
+        print(
+            f"Total prediction uncertainty: "
+            f"{n_predicted_full_total_error:.3f}"
         )
 
         # Page 3: subtract the fixed, scaled burn-sample prediction from each
@@ -883,21 +1436,9 @@ if __name__ == "__main__":
             gaussian_fit_status = int(fit_result)
             gaussian_fit_succeeded = gaussian_fit_status == 0
             if gaussian_fit_succeeded:
-                try:
-                    gaussian_fit_covariance = np.array([
-                        [
-                            float(fit_result.CovMatrix(i, j))
-                            for j in range(3)
-                        ]
-                        for i in range(3)
-                    ])
-                except (AttributeError, TypeError):
-                    # Older PyROOT bindings may not expose CovMatrix through
-                    # TFitResultPtr. Retain parameter variances in that case.
-                    gaussian_fit_covariance = np.diag([
-                        gaussian_fit.GetParError(i)**2
-                        for i in range(3)
-                    ])
+                gaussian_fit_covariance = fit_covariance_matrix(
+                    fit_result, gaussian_fit, 3
+                )
                 gaussian_fit.SetLineColor(ROOT.kBlue)
                 gaussian_fit.SetLineWidth(3)
                 gaussian_fit.Draw("same")
@@ -1079,9 +1620,13 @@ if __name__ == "__main__":
             )
             # The burn-sample exponential fit and the full-data Gaussian fit
             # are treated as independent for this approximate propagation.
-            n_predicted_combined_full_error = np.sqrt(
+            n_predicted_combined_full_statistical_error = np.sqrt(
                 n_predicted_full_error**2
                 + n_predicted_gaussian_full_error**2
+            )
+            n_predicted_combined_full_total_error = np.hypot(
+                n_predicted_combined_full_statistical_error,
+                n_predicted_full_fit_start_systematic,
             )
 
             print("\nFull-data combined-model estimate:")
@@ -1089,7 +1634,9 @@ if __name__ == "__main__":
             print(
                 f"Exponential component above cut: "
                 f"{n_predicted_full:.3f} +/- "
-                f"{n_predicted_full_error:.3f}"
+                f"{n_predicted_full_error:.3f} (fit statistical) +/- "
+                f"{n_predicted_full_fit_start_systematic:.3f} "
+                f"(fit-start range)"
             )
             print(
                 f"Gaussian component above cut: "
@@ -1099,7 +1646,14 @@ if __name__ == "__main__":
             print(
                 f"Combined predicted events above cut: "
                 f"{n_predicted_combined_full:.3f} +/- "
-                f"{n_predicted_combined_full_error:.3f}"
+                f"{n_predicted_combined_full_statistical_error:.3f} "
+                f"(fit statistical) +/- "
+                f"{n_predicted_full_fit_start_systematic:.3f} "
+                f"(fit-start range)"
+            )
+            print(
+                f"Combined total uncertainty: "
+                f"{n_predicted_combined_full_total_error:.3f}"
             )
             print(
                 "The Gaussian component is fitted to the full-data excess; "
