@@ -545,7 +545,7 @@ for TASK_LINE in "${TASK_LINES[@]}"; do
     # Run Python
     # ========================================================
 
-    python -u applyHitFilter_simPreprocessed.py \
+    python -u applyHitFilter.py \
         "${DIR_IN}" \
         "${DIR_OUT}" \
         "${STATION}" \
